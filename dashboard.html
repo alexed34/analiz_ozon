@@ -138,7 +138,6 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 let allData = [];
 let filteredData = [];
 let charts = {};
-let chartInitialized = {};
 
 const NUMERIC_FIELDS = {
   'Заказано на сумму, ?': 'revenue',
@@ -151,12 +150,14 @@ const NUMERIC_FIELDS = {
   'Посещения карточки товара': 'visits',
   'Доля выкупа, %': 'buyoutRate',
   'Объем товара, л': 'volume',
-  'Время доставки': 'deliveryTime',
   'Динамика суммы заказов, %': 'dynamics',
   'Доля затрат на Ozon, FBO, %': 'fboCost',
   'Доля затрат на Ozon, FBS, %': 'fbsCost',
+  'Доля рекламных расходов, %': 'adShare',
   'В корзину из поиска и каталога, %': 'cartFromSearch',
-  'Самые низкие цены товара': 'lowestPrice'
+  'В корзину из карточки, %': 'cartFromCard',
+  'Дней без остатка, дни': 'oosDays',
+  'Самая низкая цена, ?': 'lowestPrice'
 };
 
 function parseNum(v) {
@@ -179,55 +180,6 @@ function parsePct(v) {
   let n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 }
-
-function parseCSV(csv) {
-  csv = csv.replace(/^\uFEFF/, '');
-  const lines = csv.trim().split('\n');
-  if (lines.length < 3) return [];
-  let headers = lines[0].split(';').map(h => h.trim());
-  headers = headers.map(h => h.replace(/\u20BD/g, '?'));
-  const rows = [];
-  for (let i = 2; i < lines.length; i++) {
-    const vals = lines[i].split(';');
-    if (vals.length < 5) continue;
-    const row = {};
-    headers.forEach((h, j) => {
-      let v = (vals[j] || '').trim();
-      row[h] = v;
-      if (NUMERIC_FIELDS[h]) {
-        if (h.includes('%')) row[h + '_num'] = parsePct(v);
-        else row[h + '_num'] = parseNum(v);
-      }
-    });
-    row._name = row['Название товара'] || '';
-    row._brand = row['Бренд'] || '';
-    row._category = row['Категория 3 уровня'] || '';
-    row._scheme = row['Схема работы'] || '';
-    row._super = row['Super-товар'] || '';
-    row._revenue = row['Заказано на сумму, ?_num'] || 0;
-    row._orders = row['Заказано товаров_num'] || 0;
-    row._price = row['Средняя цена покупки, ?_num'] || 0;
-    row._lost = row['Упущенные продажи, ?_num'] || 0;
-    row._dailySales = row['Среднесуточные продажи, ?_num'] || 0;
-    row._impressions = row['Показы в поиске и каталоге_num'] || 0;
-    row._visits = row['Посещения карточки товара_num'] || 0;
-    row._buyout = row['Доля выкупа, %_num'] || 0;
-    row._adShare = row['Доля рекламных расходов, %_num'] || 0;
-    row._daysInStock = row['Дней без остатка, дни_num'] || 0;
-    row._cartConv = row['В корзину из карточки, %_num'] || 0;
-    row._volume = row['Объем товара, л_num'] || 0;
-    row._deliveryTime = row['Среднее время доставки_num'] || row['Среднее время доставки, дн_num'] || 0;
-    row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
-    row._weight = row['Вес_num'] || 0;
-    row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
-    row._fbsCost = row['Доля затрат на Ozon, FBS, %_num'] || 0;
-    row._dailySalesQty = row['Среднесуточные продажи, шт_num'] || 0;
-    row._lowestPrice = row['Самая низкая цена, ?_num'] || 0;
-    rows.push(row);
-  }
-  return rows;
-}
-
 let DATA_PERIOD = '28 дней';
 
 function parseXLSXData(wb) {
@@ -281,17 +233,17 @@ function parseXLSXData(wb) {
     row._impressions = row['Показы в поиске и каталоге_num'] || 0;
     row._visits = row['Посещения карточки товара_num'] || 0;
     row._buyout = row['Доля выкупа, %_num'] || 0;
-    row._adShare = 0;
-    row._daysInStock = row['Среднесуточные продажи, шт_num'] || 0;
-    row._cartConv = 0;
+    row._adShare = row['Доля рекламных расходов, %_num'] || 0;
+    row._daysInStock = row['Дней без остатка, дни_num'] || 0;
+    row._cartConv = row['В корзину из карточки, %_num'] || 0;
     row._volume = row['Объем товара, л_num'] || 0;
-    row._deliveryTime = row['Время доставки_num'] || 0;
+    row._deliveryTime = row['Среднее время доставки_num'] || 0;
     row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
     row._weight = 0;
     row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
     row._fbsCost = row['Доля затрат на Ozon, FBS, %_num'] || 0;
     row._dailySalesQty = row['Среднесуточные продажи, шт_num'] || 0;
-    row._lowestPrice = row['Самые низкие цены товара_num'] || 0;
+    row._lowestPrice = row['Самая низкая цена, ?_num'] || 0;
     rows.push(row);
   }
   return rows;
@@ -300,7 +252,7 @@ function parseXLSXData(wb) {
 // ======================== INDEXEDDB CACHE ========================
 const DB_NAME = 'coffeeDashboard';
 const DB_STORE = 'dataset';
-const DB_CACHE_KEY = 'main_v2';
+const DB_CACHE_KEY = 'main_v3';
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -510,7 +462,6 @@ function formatCurrency(v) {
 // ======================== CHARTS ========================
 function fmt(v) { return v.toLocaleString(); }
 function fmtM(v) { return v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0); }
-function fmtPct(v) { return (v/100).toLocaleString(undefined,{style:'percent',minimumFractionDigits:1}) }
 
 const COLORS = ['#0071e3','#34c759','#ff9500','#ff3b30','#af52de','#5856d6','#ff2d55','#00c7be','#ff6482','#36c9a6','#5e5ce6','#ff9f0a','#ff375f','#30d158','#64d2ff','#bf5af2'];
 const LIGHT_BG = 'rgba(0,0,0,.03)';
@@ -527,23 +478,6 @@ function createChart(id, option) {
   return charts[id];
 }
 
-function createChartCard(containerId, chartId, title, desc, fullscreen) {
-  const container = document.getElementById(containerId);
-  const card = document.createElement('div');
-  card.className = 'chart-card';
-  card.id = 'card-' + chartId;
-  card.innerHTML = `
-    <div class="chart-header">
-      <div><div class="chart-title">${title}</div><div class="chart-desc">${desc}</div></div>
-      <div class="chart-actions">
-        <button onclick="exportChartPNG('${chartId}')" title="Экспорт PNG">⬇</button>
-        <button onclick="toggleFullscreen('${chartId}')" title="Полноэкранный режим">⛶</button>
-      </div>
-    </div>
-    <div class="chart-container" id="${chartId}"></div>
-  `;
-  container.appendChild(card);
-}
 
 function exportChartPNG(chartId) {
   const chart = charts[chartId];
@@ -1643,10 +1577,6 @@ function closeChartHelp() {
   document.getElementById('helpModal').classList.remove('open');
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeChartHelp();
-});
-
 function buildUI() {
   const grid = document.getElementById('chartsGrid');
   CHART_DEFS.forEach(c => {
@@ -1687,6 +1617,7 @@ function exportFilteredCSV() {
 // ======================== KEYBOARD ========================
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    closeChartHelp();
     document.querySelectorAll('.fullscreen-active').forEach(el => {
       el.classList.remove('fullscreen-active');
       const container = el.querySelector('.chart-container-full, .chart-container');
