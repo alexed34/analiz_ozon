@@ -1,0 +1,988 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кофе на Ozon — Дашборд</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;background:#f5f5f7;color:#1d1d1f;-webkit-font-smoothing:antialiased;padding:20px}
+.container{max-width:1440px;margin:0 auto}
+header{margin-bottom:24px;padding:0 4px}
+header h1{font-size:32px;font-weight:700;letter-spacing:-.5px;color:#1d1d1f;margin-bottom:4px}
+header p{font-size:14px;color:#86868b;font-weight:400}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.kpi-card{background:rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:16px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7);transition:transform .2s ease,box-shadow .2s ease}
+.kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04)}
+.kpi-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#86868b;margin-bottom:6px}
+.kpi-value{font-size:20px;font-weight:700;color:#1d1d1f;letter-spacing:-.3px}
+.kpi-sub{font-size:11px;color:#86868b;margin-top:2px}
+.filters-bar{background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:16px 20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7)}
+.filters-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+.filters-top input,.filters-top select{padding:8px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;background:rgba(255,255,255,0.9);outline:none;transition:border-color .2s;font-family:inherit;color:#1d1d1f}
+.filters-top input:focus,.filters-top select:focus{border-color:#0071e3;box-shadow:0 0 0 3px rgba(0,113,227,.15)}
+.filters-top input{min-width:160px}
+.filters-top select{min-width:140px;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2386868b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.filter-checkbox{display:flex;align-items:center;gap:6px;font-size:13px;color:#1d1d1f;cursor:pointer;white-space:nowrap}
+.filter-checkbox input{width:16px;height:16px;accent-color:#0071e3;cursor:pointer}
+.filters-bottom{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.range-group{display:flex;align-items:center;gap:6px;font-size:12px;color:#86868b}
+.range-group input{width:80px;padding:6px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none;font-family:inherit;color:#1d1d1f}
+.range-group input:focus{border-color:#0071e3}
+.filter-btn{padding:8px 16px;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit}
+.filter-btn-primary{background:#0071e3;color:#fff}
+.filter-btn-primary:hover{background:#0077ed}
+.filter-btn-reset{background:rgba(0,0,0,.05);color:#1d1d1f;border:1px solid rgba(0,0,0,.08)}
+.filter-btn-reset:hover{background:rgba(0,0,0,.1)}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px;margin-bottom:24px}
+.chart-card{background:rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7);transition:box-shadow .3s ease}
+.chart-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04)}
+.chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.chart-title{font-size:14px;font-weight:600;color:#1d1d1f}
+.chart-desc{font-size:11px;color:#86868b;margin-top:2px}
+.chart-actions{display:flex;gap:4px}
+.chart-actions button{width:28px;height:28px;border:none;border-radius:8px;background:rgba(0,0,0,.04);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .2s;color:#86868b}
+.chart-actions button:hover{background:rgba(0,0,0,.1);color:#1d1d1f}
+.chart-container{width:100%;height:360px}
+.chart-container-full{width:100%;height:calc(100vh - 300px);min-height:500px}
+.fullscreen-active{position:fixed!important;top:0;left:0;width:100vw;height:100vh;z-index:9999;padding:24px;background:#f5f5f7;border-radius:0!important;overflow:auto}
+.fullscreen-active .chart-container{height:calc(100vh - 180px)!important}
+.kpi-filter-count{font-size:12px;color:#86868b;margin-left:auto;white-space:nowrap}
+@media(max-width:768px){body{padding:12px}.kpi-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.charts-grid{grid-template-columns:1fr}.kpi-value{font-size:16px}.filters-top input,.filters-top select{min-width:120px}.range-group input{width:60px}}
+@media(max-width:480px){.kpi-grid{grid-template-columns:repeat(2,1fr)}header h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <div style="display:flex;align-items:baseline;gap:16px">
+    <h1>Кофе на Ozon</h1>
+    <a href="index.html" style="font-size:13px;color:#86868b;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#0071e3'" onmouseout="this.style.color='#86868b'">← На главную</a>
+  </div>
+  <p id="subtitle">Загрузка данных…</p>
+</header>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="filters-bar" id="filtersBar">
+  <div class="filters-top">
+    <input type="text" id="filterSearch" placeholder="Поиск товара…" oninput="applyFilters()">
+    <select id="filterBrand" onchange="applyFilters()"><option value="">Все бренды</option></select>
+    <select id="filterCategory" onchange="applyFilters()"><option value="">Все категории</option></select>
+    <select id="filterScheme" onchange="applyFilters()"><option value="">Все схемы</option></select>
+    <select id="filterSuper" onchange="applyFilters()"><option value="">Super-товар</option><option value="Да">Да</option><option value="Нет">Нет</option></select>
+    <label class="filter-checkbox"><input type="checkbox" id="filterInStock" onchange="applyFilters()"> В наличии</label>
+    <span class="kpi-filter-count" id="filterCount"></span>
+  </div>
+  <div class="filters-bottom">
+    <div class="range-group">
+      <span>Цена:</span>
+      <input type="number" id="filterPriceMin" placeholder="от" onchange="applyFilters()">
+      <span>—</span>
+      <input type="number" id="filterPriceMax" placeholder="до" onchange="applyFilters()">
+    </div>
+    <div class="range-group">
+      <span>Выручка:</span>
+      <input type="number" id="filterRevMin" placeholder="от" onchange="applyFilters()">
+      <span>—</span>
+      <input type="number" id="filterRevMax" placeholder="до" onchange="applyFilters()">
+    </div>
+    <div class="range-group">
+      <span>Выкуп ≥</span>
+      <input type="number" id="filterBuyoutMin" placeholder="%" onchange="applyFilters()" style="width:60px">
+    </div>
+    <div class="range-group">
+      <span>Реклама ≤</span>
+      <input type="number" id="filterAdMax" placeholder="%" onchange="applyFilters()" style="width:60px">
+    </div>
+    <button class="filter-btn filter-btn-reset" onclick="resetFilters()">Сбросить</button>
+    <button class="filter-btn filter-btn-primary" onclick="exportFilteredCSV()" style="margin-left:auto">Экспорт CSV</button>
+  </div>
+</div>
+
+<div class="charts-grid" id="chartsGrid"></div>
+</div>
+
+<script>
+// ======================== DATA ========================
+let allData = [];
+let filteredData = [];
+let charts = {};
+let chartInitialized = {};
+
+const NUMERIC_FIELDS = {
+  'Заказано на сумму, ?': 'revenue',
+  'Заказано товаров': 'orders',
+  'Средняя цена покупки, ?': 'avgPrice',
+  'Упущенные продажи, ?': 'lostSales',
+  'Среднесуточные продажи, ?': 'dailySales',
+  'Среднесуточные продажи, шт': 'dailySalesQty',
+  'Показы в поиске и каталоге': 'impressions',
+  'Посещения карточки товара': 'visits',
+  'В корзину из карточки, %': 'cartConv',
+  'Доля рекламных расходов, %': 'adShare',
+  'Доля выкупа, %': 'buyoutRate',
+  'Дней без остатка, дни': 'daysOutOfStock',
+  'Объем товара, л': 'volume',
+  'Среднее время доставки': 'deliveryTime',
+  'Динамика суммы заказов, %': 'dynamics',
+  'Доля затрат на Ozon, FBO, %': 'fboCost',
+  'Доля затрат на Ozon, FBS, %': 'fbsCost',
+  'В корзину из поиска и каталога, %': 'cartFromSearch'
+};
+
+function parseNum(v) {
+  if (v == null || v === '' || v === '—' || v === '-') return 0;
+  let s = String(v).trim();
+  if (s === '—' || s === '-') return 0;
+  if (s.includes('из')) {
+    let m = s.match(/([\d\s]+)\s*из/);
+    return m ? parseFloat(m[1].replace(/\s/g, '').replace(',', '.')) : 0;
+  }
+  s = s.replace(/[^\d,\-\.]/g, '').trim();
+  s = s.replace(',', '.');
+  if (/^-?[\d.]+$/.test(s)) return parseFloat(s);
+  return 0;
+}
+
+function parsePct(v) {
+  if (v == null || v === '' || v === '—' || v === '-') return 0;
+  let s = String(v).trim().replace('%', '').replace(/\s/g, '').replace(',', '.');
+  let n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function parseCSV(csv) {
+  csv = csv.replace(/^\uFEFF/, '');
+  const lines = csv.trim().split('\n');
+  if (lines.length < 3) return [];
+  let headers = lines[0].split(';').map(h => h.trim());
+  headers = headers.map(h => h.replace(/\u20BD/g, '?'));
+  const rows = [];
+  for (let i = 2; i < lines.length; i++) {
+    const vals = lines[i].split(';');
+    if (vals.length < 5) continue;
+    const row = {};
+    headers.forEach((h, j) => {
+      let v = (vals[j] || '').trim();
+      row[h] = v;
+      if (NUMERIC_FIELDS[h]) {
+        if (h.includes('%')) row[h + '_num'] = parsePct(v);
+        else row[h + '_num'] = parseNum(v);
+      }
+    });
+    row._name = row['Название товара'] || '';
+    row._brand = row['Бренд'] || '';
+    row._category = row['Категория 3 уровня'] || '';
+    row._scheme = row['Схема работы'] || '';
+    row._super = row['Super-товар'] || '';
+    row._revenue = row['Заказано на сумму, ?_num'] || 0;
+    row._orders = row['Заказано товаров_num'] || 0;
+    row._price = row['Средняя цена покупки, ?_num'] || 0;
+    row._lost = row['Упущенные продажи, ?_num'] || 0;
+    row._dailySales = row['Среднесуточные продажи, ?_num'] || 0;
+    row._impressions = row['Показы в поиске и каталоге_num'] || 0;
+    row._visits = row['Посещения карточки товара_num'] || 0;
+    row._buyout = row['Доля выкупа, %_num'] || 0;
+    row._adShare = row['Доля рекламных расходов, %_num'] || 0;
+    row._daysInStock = row['Дней без остатка, дни_num'] || 0;
+    row._cartConv = row['В корзину из карточки, %_num'] || 0;
+    row._volume = row['Объем товара, л_num'] || 0;
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseXLSXData(wb) {
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+  if (json.length < 3) return [];
+  let headers = json[0].map(h => String(h || '').trim());
+  headers = headers.map(h => h.replace(/\u20BD/g, '?'));
+  const rows = [];
+  for (let i = 2; i < json.length; i++) {
+    const vals = json[i];
+    if (!vals || vals.length < 3) continue;
+    const row = {};
+    headers.forEach((h, j) => {
+      let v = vals[j];
+      if (v == null) v = '';
+      row[h] = v;
+      if (NUMERIC_FIELDS[h]) {
+        if (h.includes('%')) {
+          if (typeof v === 'number') row[h + '_num'] = v * 100;
+          else row[h + '_num'] = parsePct(String(v));
+        } else {
+          if (typeof v === 'number') row[h + '_num'] = v;
+          else if (typeof v === 'string' && v.includes('из')) row[h + '_num'] = parseNum(v);
+          else row[h + '_num'] = parseNum(String(v));
+        }
+      }
+    });
+    row._name = row['Название товара'] || '';
+    row._brand = row['Бренд'] || '';
+    row._category = row['Категория 3 уровня'] || '';
+    row._scheme = row['Схема работы'] || '';
+    row._super = row['Super-товар'] || '';
+    row._revenue = row['Заказано на сумму, ?_num'] || 0;
+    row._orders = row['Заказано товаров_num'] || 0;
+    row._price = row['Средняя цена покупки, ?_num'] || 0;
+    row._lost = row['Упущенные продажи, ?_num'] || 0;
+    row._dailySales = row['Среднесуточные продажи, ?_num'] || 0;
+    row._impressions = row['Показы в поиске и каталоге_num'] || 0;
+    row._visits = row['Посещения карточки товара_num'] || 0;
+    row._buyout = row['Доля выкупа, %_num'] || 0;
+    row._adShare = row['Доля рекламных расходов, %_num'] || 0;
+    row._daysInStock = row['Дней без остатка, дни_num'] || 0;
+    row._cartConv = row['В корзину из карточки, %_num'] || 0;
+    row._volume = row['Объем товара, л_num'] || 0;
+    rows.push(row);
+  }
+  return rows;
+}
+
+async function loadData() {
+  if (location.protocol === 'file:') {
+    document.getElementById('subtitle').textContent = '⚠ Откройте через локальный сервер (file:// не поддерживается)';
+    const msg = document.getElementById('chartsGrid');
+    msg.innerHTML = '<div class="chart-card" style="grid-column:1/-1;padding:40px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠</div><div class="chart-title" style="font-size:18px;margin-bottom:8px">Локальный файл не загрузится через file://</div><div class="chart-desc" style="font-size:14px;line-height:1.6">Современные браузеры блокируют fetch() для локальных файлов.<br><br><b>Вариант A</b> — Python (установлен):<br><code style="background:#f0f0f0;padding:2px 8px;border-radius:4px">python -m http.server 8080</code><br>→ Откройте <a href="http://localhost:8080" target="_blank">http://localhost:8080</a><br><br><b>Вариант B</b> — Node.js:<br><code style="background:#f0f0f0;padding:2px 8px;border-radius:4px">npx serve .</code><br><br><b>Вариант C</b> — VS Code: установите расширение Live Server, кликните правой кнопкой на dashboard.html → Open with Live Server</div></div>';
+    return;
+  }
+  try {
+    const resp = await fetch('data.xlsx');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const buf = await resp.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    allData = parseXLSXData(wb);
+    if (allData.length === 0) throw new Error('Нет данных');
+    document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · 28 дней · Интерактивная аналитика';
+    initDashboard();
+  } catch (e) {
+    document.getElementById('subtitle').textContent = 'Ошибка загрузки data.xlsx — ' + e.message + '. Запустите локальный сервер.';
+  }
+}
+
+// ======================== FILTERS ========================
+function getFilterValues() {
+  return {
+    search: (document.getElementById('filterSearch').value || '').toLowerCase().trim(),
+    brand: document.getElementById('filterBrand').value,
+    category: document.getElementById('filterCategory').value,
+    scheme: document.getElementById('filterScheme').value,
+    superVal: document.getElementById('filterSuper').value,
+    inStock: document.getElementById('filterInStock').checked,
+    priceMin: parseFloat(document.getElementById('filterPriceMin').value) || 0,
+    priceMax: parseFloat(document.getElementById('filterPriceMax').value) || 0,
+    revMin: parseFloat(document.getElementById('filterRevMin').value) || 0,
+    revMax: parseFloat(document.getElementById('filterRevMax').value) || 0,
+    buyoutMin: parseFloat(document.getElementById('filterBuyoutMin').value) || 0,
+    adMax: parseFloat(document.getElementById('filterAdMax').value) || 100
+  };
+}
+
+function filterData(data, f) {
+  return data.filter(d => {
+    if (f.search && !d._name.toLowerCase().includes(f.search) && !d._brand.toLowerCase().includes(f.search)) return false;
+    if (f.brand && d._brand !== f.brand) return false;
+    if (f.category && d._category !== f.category) return false;
+    if (f.scheme && d._scheme !== f.scheme) return false;
+    if (f.superVal && d._super !== f.superVal) return false;
+    if (f.inStock && d._daysInStock <= 0) return false;
+    if (f.priceMin > 0 && d._price < f.priceMin) return false;
+    if (f.priceMax > 0 && d._price > f.priceMax) return false;
+    if (f.revMin > 0 && d._revenue < f.revMin) return false;
+    if (f.revMax > 0 && d._revenue > f.revMax) return false;
+    if (f.buyoutMin > 0 && d._buyout < f.buyoutMin) return false;
+    if (f.adMax < 100 && d._adShare > f.adMax) return false;
+    return true;
+  });
+}
+
+function applyFilters() {
+  const f = getFilterValues();
+  const filt = filterData(allData, f);
+  filteredData = filt;
+  document.getElementById('filterCount').textContent = 'Показано: ' + filt.length.toLocaleString() + ' из ' + allData.length.toLocaleString();
+  saveFilterState();
+  renderAllCharts();
+  renderKPI();
+}
+
+function resetFilters() {
+  document.getElementById('filterSearch').value = '';
+  document.getElementById('filterBrand').value = '';
+  document.getElementById('filterCategory').value = '';
+  document.getElementById('filterScheme').value = '';
+  document.getElementById('filterSuper').value = '';
+  document.getElementById('filterInStock').checked = false;
+  document.getElementById('filterPriceMin').value = '';
+  document.getElementById('filterPriceMax').value = '';
+  document.getElementById('filterRevMin').value = '';
+  document.getElementById('filterRevMax').value = '';
+  document.getElementById('filterBuyoutMin').value = '';
+  document.getElementById('filterAdMax').value = '';
+  applyFilters();
+}
+
+function saveFilterState() {
+  try {
+    const f = getFilterValues();
+    localStorage.setItem('coffeeDashboardFilters', JSON.stringify(f));
+  } catch(e) {}
+}
+
+function restoreFilterState() {
+  try {
+    const saved = localStorage.getItem('coffeeDashboardFilters');
+    if (saved) {
+      const f = JSON.parse(saved);
+      if (f.search) document.getElementById('filterSearch').value = f.search;
+      if (f.brand) document.getElementById('filterBrand').value = f.brand;
+      if (f.category) document.getElementById('filterCategory').value = f.category;
+      if (f.scheme) document.getElementById('filterScheme').value = f.scheme;
+      if (f.superVal) document.getElementById('filterSuper').value = f.superVal;
+      document.getElementById('filterInStock').checked = f.inStock || false;
+      if (f.priceMin) document.getElementById('filterPriceMin').value = f.priceMin;
+      if (f.priceMax) document.getElementById('filterPriceMax').value = f.priceMax;
+      if (f.revMin) document.getElementById('filterRevMin').value = f.revMin;
+      if (f.revMax) document.getElementById('filterRevMax').value = f.revMax;
+      if (f.buyoutMin) document.getElementById('filterBuyoutMin').value = f.buyoutMin;
+      if (f.adMax && f.adMax < 100) document.getElementById('filterAdMax').value = f.adMax;
+    }
+  } catch(e) {}
+}
+
+// ======================== KPI ========================
+function renderKPI() {
+  const d = filteredData;
+  const totalRev = d.reduce((s, r) => s + r._revenue, 0);
+  const totalOrd = d.reduce((s, r) => s + r._orders, 0);
+  const skuCount = d.length;
+  const brands = new Set(d.map(r => r._brand));
+  const brandCount = brands.size;
+  const avgP = d.filter(r => r._price > 0).reduce((s, r, _, a) => s + r._price / a.length, 0);
+  const avgBuyout = d.filter(r => r._buyout > 0).reduce((s, r, _, a) => s + r._buyout / a.length, 0);
+  const lostSum = d.reduce((s, r) => s + r._lost, 0);
+  const avgAd = d.filter(r => r._adShare > 0).reduce((s, r, _, a) => s + r._adShare / a.length, 0);
+  const kpis = [
+    { label: 'Общая выручка', val: formatCurrency(totalRev) },
+    { label: 'Продано товаров', val: totalOrd.toLocaleString(), sub: 'шт' },
+    { label: 'Количество SKU', val: skuCount.toLocaleString() },
+    { label: 'Количество брендов', val: brandCount.toLocaleString() },
+    { label: 'Средняя цена', val: formatCurrency(avgP) },
+    { label: 'Средний % выкупа', val: avgBuyout.toFixed(1) + '%' },
+    { label: 'Упущенные продажи', val: formatCurrency(lostSum) },
+    { label: 'Средняя доля рекламных расходов', val: avgAd.toFixed(1) + '%' }
+  ];
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = kpis.map(k => `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.val}</div>${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>`).join('');
+}
+
+function formatCurrency(v) {
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + ' млрд ₽';
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + ' млн ₽';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + ' тыс ₽';
+  return Math.round(v).toLocaleString() + ' ₽';
+}
+
+// ======================== CHARTS ========================
+function fmt(v) { return v.toLocaleString(); }
+function fmtM(v) { return v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0); }
+function fmtPct(v) { return (v/100).toLocaleString(undefined,{style:'percent',minimumFractionDigits:1}) }
+
+const COLORS = ['#0071e3','#34c759','#ff9500','#ff3b30','#af52de','#5856d6','#ff2d55','#00c7be','#ff6482','#36c9a6','#5e5ce6','#ff9f0a','#ff375f','#30d158','#64d2ff','#bf5af2'];
+const LIGHT_BG = 'rgba(0,0,0,.03)';
+
+function createChart(id, option) {
+  const dom = document.getElementById(id);
+  if (!dom) return;
+  if (charts[id]) charts[id].dispose();
+  const chart = echarts.init(dom, null, { renderer: 'canvas' });
+  chart.setOption(option);
+  charts[id] = chart;
+  window.addEventListener('resize', () => chart.resize());
+  return chart;
+}
+
+function createChartCard(containerId, chartId, title, desc, fullscreen) {
+  const container = document.getElementById(containerId);
+  const card = document.createElement('div');
+  card.className = 'chart-card';
+  card.id = 'card-' + chartId;
+  card.innerHTML = `
+    <div class="chart-header">
+      <div><div class="chart-title">${title}</div><div class="chart-desc">${desc}</div></div>
+      <div class="chart-actions">
+        <button onclick="exportChartPNG('${chartId}')" title="Экспорт PNG">⬇</button>
+        <button onclick="toggleFullscreen('${chartId}')" title="Полноэкранный режим">⛶</button>
+      </div>
+    </div>
+    <div class="chart-container" id="${chartId}"></div>
+  `;
+  container.appendChild(card);
+}
+
+function exportChartPNG(chartId) {
+  const chart = charts[chartId];
+  if (!chart) return;
+  const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = chartId + '.png';
+  a.click();
+}
+
+function toggleFullscreen(chartId) {
+  const card = document.getElementById('card-' + chartId);
+  if (!card) return;
+  const isFS = card.classList.contains('fullscreen-active');
+  if (isFS) {
+    card.classList.remove('fullscreen-active');
+    const container = document.getElementById(chartId);
+    container.classList.remove('chart-container-full');
+    container.classList.add('chart-container');
+    if (charts[chartId]) charts[chartId].resize();
+  } else {
+    card.classList.add('fullscreen-active');
+    const container = document.getElementById(chartId);
+    container.classList.remove('chart-container');
+    container.classList.add('chart-container-full');
+    setTimeout(() => { if (charts[chartId]) charts[chartId].resize(); }, 100);
+  }
+}
+
+// ======================== CROSS-FILTERING ========================
+function handleChartClick(sourceId, params) {
+  const name = params.name || params.value?.[0];
+  if (!name) return;
+  let field = null;
+  let value = name;
+  if (sourceId === 'ch-revenue-cat' || sourceId === 'ch-daily-sales') {
+    field = '_category';
+  } else if (sourceId === 'ch-top-brands' || sourceId === 'ch-lost-sales') {
+    field = '_brand';
+  } else if (sourceId === 'ch-super') {
+    field = '_super';
+  }
+  if (field) {
+    const el = document.getElementById('filterCategory');
+    if (el && field === '_category') {
+      el.value = el.value === value ? '' : value;
+    }
+    const el2 = document.getElementById('filterBrand');
+    if (el2 && field === '_brand') {
+      el2.value = el2.value === value ? '' : value;
+    }
+    applyFilters();
+  }
+}
+
+// ======================== CHART DEFINITIONS ========================
+
+function renderCharts() {
+  const d = filteredData;
+  if (!d.length) return;
+
+  // 1. Revenue by category
+  renderRevenueByCategory(d);
+  // 2. Top-20 brands
+  renderTopBrands(d);
+  // 3. Price distribution
+  renderPriceDist(d);
+  // 4. Price vs Sales scatter
+  renderPriceSales(d);
+  // 5. Bubble chart
+  renderBubble(d);
+  // 6. ABC Pareto
+  renderPareto(d);
+  // 7. Avg daily sales by category
+  renderDailySales(d);
+  // 8. Funnel
+  renderFunnel(d);
+  // 9. Shows vs Visits
+  renderShowsVisits(d);
+  // 10. Top-20 lost sales
+  renderLostSales(d);
+  // 11. Correlation matrix
+  renderCorrelation(d);
+  // 12. Price x Category heatmap
+  renderHeatmap(d);
+}
+
+function renderAllCharts() {
+  Object.keys(charts).forEach(id => {
+    if (charts[id]) charts[id].dispose();
+  });
+  charts = {};
+  chartInitialized = {};
+  renderCharts();
+}
+
+// ---------- 1. Revenue by Category ----------
+function renderRevenueByCategory(d) {
+  const map = {};
+  d.forEach(r => { const k = r._category || 'Другое'; if (!map[k]) map[k] = 0; map[k] += r._revenue; });
+  let entries = Object.entries(map).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+  const labels = entries.map(e => e[0]);
+  const values = entries.map(e => e[1]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const v = p[0]; return `<b>${v.name}</b><br/>Выручка: <b>${fmt(v.value)} ₽</b> (${(v.value / values.reduce((a,b)=>a+b,0) * 100).toFixed(1)}%)`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 40,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#0071e3' }, { offset: 1, color: '#40a9ff' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#005bbf' } }
+    }]
+  };
+  createChart('ch-revenue-cat', option);
+}
+
+// ---------- 2. Top-20 Brands ----------
+function renderTopBrands(d) {
+  const map = {};
+  d.forEach(r => { const k = r._brand || 'Другое'; if (!map[k]) map[k] = 0; map[k] += r._revenue; });
+  let entries = Object.entries(map).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 20).reverse();
+  const labels = entries.map(e => e[0].length > 20 ? e[0].slice(0, 20) + '…' : e[0]);
+  const values = entries.map(e => e[1]);
+  const fullNames = entries.map(e => e[0]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Выручка: <b>${fmt(values[idx])} ₽</b>`;
+    }},
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 20,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#34c759' }, { offset: 1, color: '#30d158' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#28a745' } },
+      label: { show: true, position: 'right', formatter: p => fmtM(p.value), fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-top-brands', option);
+}
+
+// ---------- 3. Price Distribution ----------
+function renderPriceDist(d) {
+  let prices = d.filter(r => r._price > 0).map(r => r._price);
+  if (!prices.length) return;
+  prices.sort((a, b) => a - b);
+  const loClip = 30;
+  const hiClip = prices[Math.floor(prices.length * 0.99)];
+  prices = prices.filter(p => p >= loClip && p <= hiClip);
+  if (!prices.length) return;
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const bins = 20;
+  const step = Math.max(1, (maxP - minP) / bins);
+  const hist = Array(bins).fill(0);
+  const histLabels = [];
+  for (let i = 0; i < bins; i++) {
+    const lo = Math.round(minP + i * step);
+    const hi = Math.round(minP + (i + 1) * step);
+    histLabels.push(lo.toLocaleString() + '—' + hi.toLocaleString());
+  }
+  const excluded = d.filter(r => r._price > 0).map(r => r._price).filter(p => p < loClip || p > hiClip).length;
+  const n = prices.length;
+  prices.forEach(p => {
+    const idx = Math.min(Math.floor((p - minP) / step), bins - 1);
+    hist[idx]++;
+  });
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      return `${p[0].name} ₽<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)${excluded ? `<br/><span style="color:#86868b;font-size:10px">${excluded.toLocaleString()} выбросов скрыто</span>` : ''}`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 50, containLabel: true },
+    xAxis: { type: 'category', data: histLabels, axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(histLabels.length / 8)) }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: hist, barMaxWidth: 30,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#af52de' }, { offset: 1, color: '#c47cf0' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#8b3abf' } },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 },
+        data: [
+          { xAxis: Math.floor((prices[Math.floor(n * 0.25)] - minP) / step), label: { formatter: '25%', position: 'insideEndTop', fontSize: 9, color: '#ff3b30' } },
+          { xAxis: Math.floor((prices[Math.floor(n * 0.5)] - minP) / step), label: { formatter: 'Медиана', position: 'insideEndTop', fontSize: 9, color: '#ff3b30' } },
+          { xAxis: Math.floor((prices[Math.floor(n * 0.75)] - minP) / step), label: { formatter: '75%', position: 'insideEndTop', fontSize: 9, color: '#ff3b30' } }
+        ]
+      }
+    }]
+  };
+  createChart('ch-price-dist', option);
+}
+
+// ---------- 4. Price vs Sales ----------
+function renderPriceSales(d) {
+  const points = d.filter(r => r._price >= 30 && r._orders > 0);
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.value; return `<b>${p.data.name || ''}</b><br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Продано: <b>${fmt(d[1])} шт</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Цена, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Продано, шт', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: points.map(r => ({ value: [r._price, r._orders], name: r._name })), symbolSize: 4,
+      itemStyle: { color: 'rgba(0,113,227,0.5)' },
+      emphasis: { itemStyle: { color: '#0071e3' }, scale: 1.5 }
+    }]
+  };
+  createChart('ch-price-sales', option);
+}
+
+// ---------- 5. Bubble Chart ----------
+function renderBubble(d) {
+  const categories = [...new Set(d.map(r => r._category))].filter(Boolean);
+  const catColors = {};
+  categories.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
+  const series = categories.map(cat => {
+    const items = d.filter(r => r._category === cat && r._price >= 30 && r._orders > 0 && r._revenue > 0);
+    return {
+      name: cat, type: 'scatter',
+      data: items.map(r => ({ value: [r._price, r._revenue, r._orders], name: r._name })),
+      symbolSize: d => Math.max(4, Math.sqrt(d[2]) * 0.3),
+      itemStyle: { color: catColors[cat], opacity: 0.6 },
+      emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
+    };
+  }).filter(s => s.data.length > 0);
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data.value; return `<b>${p.data.name || ''}</b><br/>${p.seriesName}<br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Выручка: <b>${fmt(d[1])} ₽</b><br/>Продано: <b>${fmt(d[2])} шт</b>`;
+    }},
+    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'log', name: 'Цена, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Выручка, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: series
+  };
+  createChart('ch-bubble', option);
+}
+
+// ---------- 6. ABC / Pareto ----------
+function renderPareto(d) {
+  const items = d.map(r => ({ name: r._name, val: r._revenue })).filter(r => r.val > 0).sort((a, b) => b.val - a.val);
+  const total = items.reduce((s, r) => s + r.val, 0);
+  let cumSum = 0;
+  const names = items.slice(0, 30).map(r => r.name.length > 18 ? r.name.slice(0, 18) + '…' : r.name);
+  const vals = items.slice(0, 30).map(r => r.val);
+  const cumPct = items.slice(0, 30).map(r => { cumSum += r.val / total * 100; return cumSum; });
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => {
+      const idx = p[0]?.dataIndex ?? 0;
+      const item = items[idx];
+      return `<b>${item?.name || ''}</b><br/>Выручка: <b>${fmt(item?.val || 0)} ₽</b><br/>Доля: ${(item?.val / total * 100).toFixed(1)}% / Накоплено: ${cumPct[idx]?.toFixed(1)}%`;
+    }},
+    grid: { left: 10, right: 50, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'category', data: names, axisLabel: { rotate: 45, fontSize: 8, interval: Math.max(0, Math.floor(names.length / 6)) }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: [
+      { type: 'value', name: 'Выручка, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+      { type: 'value', name: '%', nameTextStyle: { fontSize: 10, color: '#86868b' }, min: 0, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { show: false } }
+    ],
+    series: [
+      { type: 'bar', data: vals, barMaxWidth: 20, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#ff9500' }, { offset: 1, color: '#ffb340' }]), borderRadius: [4,4,0,0] }, emphasis: { itemStyle: { color: '#e68600' } } },
+      { type: 'line', yAxisIndex: 1, data: cumPct, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#ff3b30', width: 2 }, itemStyle: { color: '#ff3b30' }, areaStyle: { color: 'rgba(255,59,48,0.08)' }, label: { show: true, position: 'top', formatter: p => p.value.toFixed(0) + '%', fontSize: 9, color: '#86868b' } }
+    ]
+  };
+  createChart('ch-pareto', option);
+}
+
+// ---------- 7. Avg Daily Sales by Category ----------
+function renderDailySales(d) {
+  const map = {};
+  d.forEach(r => { const k = r._category || 'Другое'; if (!map[k]) map[k] = []; map[k].push(r._dailySales); });
+  let entries = Object.entries(map).map(([k, v]) => [k, v.reduce((s, x) => s + x, 0) / v.length]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+  const labels = entries.map(e => e[0]);
+  const values = entries.map(e => e[1]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${p[0].name}</b><br/>Среднесуточные продажи: <b>${fmt(p[0].value)} ₽</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 40,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#5856d6' }, { offset: 1, color: '#7c7af0' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#3b39b5' } },
+      label: { show: true, position: 'top', formatter: p => fmtM(p.value), fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-daily-sales', option);
+}
+
+// ---------- 8. Funnel ----------
+function renderFunnel(d) {
+  const impressions = d.reduce((s, r) => s + r._impressions, 0);
+  const visits = d.reduce((s, r) => s + r._visits, 0);
+  const avgCartConv = d.filter(r => r._cartConv > 0).reduce((s, r, _, a) => s + r._cartConv / a.length, 0);
+  const estimatedCarts = visits * (avgCartConv / 100);
+  const sales = d.reduce((s, r) => s + r._orders, 0);
+  const data = [
+    { name: 'Показы', value: impressions },
+    { name: 'Посещения', value: visits },
+    { name: 'В корзину', value: Math.round(estimatedCarts) },
+    { name: 'Заказано', value: sales }
+  ];
+  const option = {
+    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${fmt(p.value)} (${p.percent}%)` },
+    series: [{
+      type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%', minSize: '10%', maxSize: '100%', sort: 'descending', gap: 4,
+      label: { show: true, position: 'inside', formatter: p => `${p.name}\n${fmt(p.value)}`, fontSize: 11, color: '#fff', fontWeight: 600 },
+      labelLine: { show: false },
+      itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 8 },
+      data: data.map((d, i) => ({ ...d, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      emphasis: { itemStyle: { opacity: 0.85 } }
+    }]
+  };
+  createChart('ch-funnel', option);
+}
+
+// ---------- 9. Shows vs Visits ----------
+function renderShowsVisits(d) {
+  const points = d.filter(r => r._impressions > 0 && r._visits > 0);
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data; return `<b>${d.name || ''}</b><br/>Показы: <b>${fmt(d[0])}</b><br/>Посещения: <b>${fmt(d[1])}</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Показы', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Посещения', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: points.map(r => ({ value: [r._impressions, r._visits], name: r._name })), symbolSize: 4,
+      itemStyle: { color: 'rgba(255,149,0,0.5)' },
+      emphasis: { itemStyle: { color: '#ff9500' }, scale: 1.5 },
+      regressionLine: { type: 'linear', show: false }
+    }]
+  };
+  createChart('ch-shows-visits', option);
+}
+
+// ---------- 10. Top-20 Lost Sales ----------
+function renderLostSales(d) {
+  const map = {};
+  d.forEach(r => { const k = r._brand || 'Другое'; if (!map[k]) map[k] = 0; map[k] += r._lost; });
+  let entries = Object.entries(map).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 20).reverse();
+  const labels = entries.map(e => e[0].length > 20 ? e[0].slice(0, 20) + '…' : e[0]);
+  const values = entries.map(e => e[1]);
+  const fullNames = entries.map(e => e[0]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Упущенные продажи: <b>${fmt(values[idx])} ₽</b>`;
+    }},
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 20,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#ff3b30' }, { offset: 1, color: '#ff6b61' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#d62d20' } },
+      label: { show: true, position: 'right', formatter: p => fmtM(p.value), fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-lost-sales', option);
+}
+
+// ---------- 11. Correlation Matrix ----------
+function renderCorrelation(d) {
+  const fields = [
+    { key: '_price', label: 'Цена' },
+    { key: '_orders', label: 'Продажи' },
+    { key: '_revenue', label: 'Выручка' },
+    { key: '_buyout', label: 'Выкуп' },
+    { key: '_adShare', label: 'Реклама' },
+    { key: '_impressions', label: 'Показы' },
+    { key: '_visits', label: 'Визиты' },
+    { key: '_cartConv', label: 'Конв.корз' },
+    { key: '_volume', label: 'Объем' },
+    { key: '_dailySales', label: 'ADS ₽' }
+  ];
+  const dataMap = {};
+  fields.forEach(f => { dataMap[f.key] = d.filter(r => r[f.key] > 0).map(r => r[f.key]); });
+  function pearson(x, y) {
+    const n = Math.min(x.length, y.length);
+    if (n < 3) return 0;
+    const sx = x.slice(0, n), sy = y.slice(0, n);
+    const mx = sx.reduce((a, b) => a + b, 0) / n;
+    const my = sy.reduce((a, b) => a + b, 0) / n;
+    let num = 0, dx2 = 0, dy2 = 0;
+    for (let i = 0; i < n; i++) {
+      const dx = sx[i] - mx, dy = sy[i] - my;
+      num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+    }
+    return dx2 && dy2 ? num / Math.sqrt(dx2 * dy2) : 0;
+  }
+  const corrData = [];
+  const labels = fields.map(f => f.label);
+  fields.forEach((f1, i) => {
+    fields.forEach((f2, j) => {
+      corrData.push([i, j, pearson(dataMap[f1.key], dataMap[f2.key]).toFixed(2)]);
+    });
+  });
+  const option = {
+    tooltip: { formatter: p => {
+      const v = p.data; return `<b>${labels[v[0]]} ↔ ${labels[v[1]]}</b><br/>Корреляция: <b>${v[2]}</b>`;
+    }},
+    grid: { left: 60, right: 20, top: 10, bottom: 50 },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
+    yAxis: { type: 'category', data: labels, axisLabel: { fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
+    visualMap: {
+      min: -1, max: 1, calculable: true, orient: 'vertical', right: 0, top: 'center', itemHeight: 150,
+      inRange: { color: ['#ff3b30', '#fff', '#34c759'] },
+      textStyle: { fontSize: 9 }
+    },
+    series: [{
+      type: 'heatmap', data: corrData, label: { show: true, fontSize: 9, color: '#1d1d1f', fontWeight: 600 },
+      emphasis: { itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.15)' } }
+    }]
+  };
+  createChart('ch-correlation', option);
+}
+
+// ---------- 12. Price x Category Heatmap ----------
+function renderHeatmap(d) {
+  const categories = [...new Set(d.map(r => r._category))].filter(Boolean).sort();
+  let allPrices = d.map(r => r._price).filter(p => p > 0).sort((a, b) => a - b);
+  const maxPrice = allPrices.length ? allPrices[Math.floor(allPrices.length * 0.97)] : 5000;
+  const binCount = 6;
+  const binStep = maxPrice / binCount || 1;
+  const bins = [];
+  for (let i = 0; i < binCount; i++) {
+    const lo = Math.round(i * binStep);
+    const hi = Math.round((i + 1) * binStep);
+    bins.push(`${lo.toLocaleString()}—${hi.toLocaleString()}`);
+  }
+  const heatData = [];
+  let maxVal = 0;
+  categories.forEach((cat, ci) => {
+    const catItems = d.filter(r => r._category === cat && r._price >= 30);
+    for (let bi = 0; bi < binCount; bi++) {
+      const lo = bi * binStep;
+      const hi = (bi + 1) * binStep;
+      const items = catItems.filter(r => r._price >= lo && (bi === binCount - 1 ? r._price <= hi : r._price < hi));
+      const val = items.length;
+      if (val > maxVal) maxVal = val;
+      heatData.push([bi, ci, val]);
+    }
+  });
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data;
+      return `<b>${categories[d[1]]}</b><br/>Цена: ${bins[d[0]]}<br/>Товаров: <b>${d[2]}</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 50, containLabel: true },
+    xAxis: { type: 'category', data: bins, axisLabel: { rotate: 30, fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
+    yAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10 }, axisLine: { show: false }, splitArea: { show: true } },
+    visualMap: {
+      min: 0, max: maxVal, calculable: true, orient: 'vertical', right: 0, top: 'center', itemHeight: 150,
+      inRange: { color: ['#f0f0f0', '#cce5ff', '#66b3ff', '#0071e3', '#003d79'] },
+      textStyle: { fontSize: 9 }
+    },
+    series: [{
+      type: 'heatmap', data: heatData,
+      label: { show: maxVal <= 50, fontSize: 10, color: '#1d1d1f' },
+      emphasis: { itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.15)' } }
+    }]
+  };
+  createChart('ch-heatmap', option);
+}
+
+// ======================== INIT ========================
+function initDashboard() {
+  populateFilters();
+  restoreFilterState();
+  applyFilters();
+  renderKPI();
+  renderCharts();
+}
+
+function populateFilters() {
+  const brands = [...new Set(allData.map(r => r._brand).filter(Boolean))].sort();
+  const cats = [...new Set(allData.map(r => r._category).filter(Boolean))].sort();
+  const schemes = [...new Set(allData.map(r => r._scheme).filter(Boolean))].sort();
+  const brandSel = document.getElementById('filterBrand');
+  brands.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; brandSel.appendChild(o); });
+  const catSel = document.getElementById('filterCategory');
+  cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+  const schSel = document.getElementById('filterScheme');
+  schemes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; schSel.appendChild(o); });
+}
+
+// ======================== BUILD UI ========================
+const CHART_DEFS = [
+  { id: 'ch-revenue-cat', title: 'Выручка по категориям кофе', desc: 'Какой тип кофе приносит больше денег — растворимый, зерновой или молотый. Помогает понять, на чём стоит сфокусироваться.' },
+  { id: 'ch-top-brands', title: 'Top-20 брендов по выручке', desc: 'Какие бренды кофе зарабатывают больше всего на Ozon. Полезно для оценки конкуренции и поиска популярных поставщиков.' },
+  { id: 'ch-price-dist', title: 'Распределение цен', desc: 'Сколько товаров стоят дёшево, а сколько — дорого. Помогает понять, в каком ценовом диапазоне больше всего предложений.' },
+  { id: 'ch-price-sales', title: 'Цена ↔ Продажи', desc: 'Влияет ли цена на количество продаж. Обычно дорогие товары покупают реже — график проверяет это правило на практике.' },
+  { id: 'ch-bubble', title: 'Bubble Chart', desc: 'Сравнение товаров по трём показателям сразу: цена, выручка и количество продаж. Размер кружка — сколько продали, цвет — тип кофе.' },
+  { id: 'ch-pareto', title: 'ABC-анализ (Pareto)', desc: 'Какие товары приносят основную долю выручки. По правилу Парето 20% товаров часто дают 80% денег — здесь это легко проверить.' },
+  { id: 'ch-daily-sales', title: 'Среднесуточные продажи по категориям', desc: 'Сколько в среднем в день зарабатывает каждая категория кофе. Помогает оценить ежедневный спрос на разные типы кофе.' },
+  { id: 'ch-funnel', title: 'Воронка продаж', desc: 'Путь покупателя: от показа товара до покупки. Видно, на каком этапе теряется больше всего людей — и где нужно улучшать.' },
+  { id: 'ch-shows-visits', title: 'Показы ↔ Посещения', desc: 'Если товар часто показывают в поиске, заходят ли на его страницу? Помогает оценить, насколько привлекательны фото и название.' },
+  { id: 'ch-lost-sales', title: 'Top-20 по упущенным продажам', desc: 'Какие бренды теряют больше всего денег из-за того, что товара нет на складе. Сигнал: завозить товар надо чаще и больше.' },
+  { id: 'ch-correlation', title: 'Корреляционная матрица', desc: 'Связаны ли разные показатели между собой. Например: чем выше цена — тем реже выкупают? Чем больше рекламы — тем больше продаж?' },
+  { id: 'ch-heatmap', title: 'Heatmap «Цена × Категория»', desc: 'Сколько товаров каждой категории продаётся в разных ценовых диапазонах. Помогает выбрать правильную цену для своего товара.' }
+];
+
+function buildUI() {
+  const grid = document.getElementById('chartsGrid');
+  CHART_DEFS.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.id = 'card-' + c.id;
+    card.innerHTML = `
+      <div class="chart-header">
+        <div><div class="chart-title">${c.title}</div><div class="chart-desc">${c.desc}</div></div>
+        <div class="chart-actions">
+          <button onclick="exportChartPNG('${c.id}')" title="Экспорт PNG">⬇</button>
+          <button onclick="toggleFullscreen('${c.id}')" title="Полноэкранный режим">⛶</button>
+        </div>
+      </div>
+      <div class="chart-container" id="${c.id}"></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ======================== EXPORT FILTERED CSV ========================
+function exportFilteredCSV() {
+  if (!filteredData.length) return;
+  const headers = Object.keys(filteredData[0]).filter(k => !k.startsWith('_'));
+  let csv = headers.join(';') + '\n';
+  filteredData.forEach(r => {
+    csv += headers.map(h => String(r[h] ?? '').includes(';') ? '"' + r[h] + '"' : r[h]).join(';') + '\n';
+  });
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'filtered_data.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ======================== KEYBOARD ========================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.fullscreen-active').forEach(el => {
+      el.classList.remove('fullscreen-active');
+      const container = el.querySelector('.chart-container-full, .chart-container');
+      if (container) {
+        container.classList.remove('chart-container-full');
+        container.classList.add('chart-container');
+      }
+      const id = el.id.replace('card-', '');
+      if (charts[id]) setTimeout(() => charts[id].resize(), 100);
+    });
+  }
+});
+
+// ======================== START ========================
+buildUI();
+loadData();
+</script>
+</body>
+</html>
