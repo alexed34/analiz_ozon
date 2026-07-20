@@ -90,7 +90,6 @@ header p{font-size:14px;color:#86868b;font-weight:400}
     <select id="filterCategory" onchange="applyFilters()"><option value="">Все категории</option></select>
     <select id="filterScheme" onchange="applyFilters()"><option value="">Все схемы</option></select>
     <select id="filterSuper" onchange="applyFilters()"><option value="">Super-товар</option><option value="Да">Да</option><option value="Нет">Нет</option></select>
-    <label class="filter-checkbox"><input type="checkbox" id="filterInStock" onchange="applyFilters()"> В наличии</label>
     <span class="kpi-filter-count" id="filterCount"></span>
   </div>
   <div class="filters-bottom">
@@ -382,60 +381,6 @@ async function loadData() {
   }
 }
 
-function handleFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const buf = e.target.result;
-      let rows = [];
-      if (file.name.toLowerCase().endsWith('.csv')) {
-        const text = new TextDecoder('utf-8').decode(new Uint8Array(buf));
-        rows = parseCSV(text);
-      } else {
-        const wb = XLSX.read(buf, { type: 'array' });
-        rows = parseXLSXData(wb);
-      }
-      if (!rows.length) throw new Error('Файл пуст или неверного формата');
-      allData = rows;
-      filteredData = allData;
-      charts = {}; chartInitialized = {};
-      document.querySelectorAll('.chart-container').forEach(c => { if (c.id && charts[c.id]) { charts[c.id].dispose(); delete charts[c.id]; } });
-      document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · загружено из файла · Интерактивная аналитика';
-      populateFilters();
-      applyFilters();
-    } catch (err) {
-      alert('Не удалось загрузить файл: ' + err.message);
-    }
-  };
-  if (file.name.toLowerCase().endsWith('.csv')) reader.readAsArrayBuffer(file);
-  else reader.readAsArrayBuffer(file);
-}
-
-function setupFileLoader() {
-  const bar = document.getElementById('filtersBar');
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
-  wrap.innerHTML = `
-    <label class="filter-btn filter-btn-reset" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-      📁 Загрузить свой файл
-      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
-    </label>
-    <span id="dropHint" style="font-size:11px;color:#86868b">Перетащите .xlsx или .csv сюда</span>
-  `;
-  bar.appendChild(wrap);
-  const input = wrap.querySelector('#fileInput');
-  input.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-  const hint = wrap.querySelector('#dropHint');
-  ['dragover', 'dragenter'].forEach(ev => hint.addEventListener(ev, e => { e.preventDefault(); hint.style.color = '#0071e3'; hint.textContent = 'Отпустите файл…'; }));
-  ['dragleave', 'dragend'].forEach(ev => hint.addEventListener(ev, e => { e.preventDefault(); hint.style.color = '#86868b'; hint.textContent = 'Перетащите .xlsx или .csv сюда'; }));
-  hint.addEventListener('drop', e => {
-    e.preventDefault();
-    hint.style.color = '#86868b';
-    hint.textContent = 'Перетащите .xlsx или .csv сюда';
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-  });
-}
-
 // ======================== FILTERS ========================
 function getFilterValues() {
   return {
@@ -444,7 +389,6 @@ function getFilterValues() {
     category: document.getElementById('filterCategory').value,
     scheme: document.getElementById('filterScheme').value,
     superVal: document.getElementById('filterSuper').value,
-    inStock: document.getElementById('filterInStock').checked,
     priceMin: parseFloat(document.getElementById('filterPriceMin').value) || 0,
     priceMax: parseFloat(document.getElementById('filterPriceMax').value) || 0,
     revMin: parseFloat(document.getElementById('filterRevMin').value) || 0,
@@ -461,7 +405,6 @@ function filterData(data, f) {
     if (f.category && d._category !== f.category) return false;
     if (f.scheme && d._scheme !== f.scheme) return false;
     if (f.superVal && d._super !== f.superVal) return false;
-    if (f.inStock && d._daysInStock <= 0) return false;
     if (f.priceMin > 0 && d._price < f.priceMin) return false;
     if (f.priceMax > 0 && d._price > f.priceMax) return false;
     if (f.revMin > 0 && d._revenue < f.revMin) return false;
@@ -494,7 +437,6 @@ function resetFilters() {
   document.getElementById('filterCategory').value = '';
   document.getElementById('filterScheme').value = '';
   document.getElementById('filterSuper').value = '';
-  document.getElementById('filterInStock').checked = false;
   document.getElementById('filterPriceMin').value = '';
   document.getElementById('filterPriceMax').value = '';
   document.getElementById('filterRevMin').value = '';
@@ -507,6 +449,7 @@ function resetFilters() {
 function saveFilterState() {
   try {
     const f = getFilterValues();
+    delete f.inStock;
     localStorage.setItem('coffeeDashboardFilters', JSON.stringify(f));
   } catch(e) {}
 }
@@ -521,7 +464,6 @@ function restoreFilterState() {
       if (f.category) document.getElementById('filterCategory').value = f.category;
       if (f.scheme) document.getElementById('filterScheme').value = f.scheme;
       if (f.superVal) document.getElementById('filterSuper').value = f.superVal;
-      document.getElementById('filterInStock').checked = f.inStock || false;
       if (f.priceMin) document.getElementById('filterPriceMin').value = f.priceMin;
       if (f.priceMax) document.getElementById('filterPriceMax').value = f.priceMax;
       if (f.revMin) document.getElementById('filterRevMin').value = f.revMin;
@@ -720,8 +662,6 @@ function renderCharts() {
   renderWeightDonut(d);
   // 28. Buyout vs Price
   renderBuyoutPrice(d);
-  // 29. Delivery time by scheme
-  renderDeliveryByScheme(d);
   CHART_DEFS.forEach(c => {
     const card = document.getElementById('card-' + c.id);
     if (card) card.style.display = charts[c.id] ? '' : 'none';
@@ -1552,30 +1492,6 @@ function renderBuyoutPrice(d) {
   createChart('ch-buyout-price', option);
 }
 
-// ---------- 29. Delivery Time by Scheme ----------
-function renderDeliveryByScheme(d) {
-  const schemes = [...new Set(d.map(r => r._scheme))].filter(Boolean);
-  if (!schemes.length) return;
-  const vals = [];
-  schemes.forEach(s => {
-    const items = d.filter(r => r._scheme === s && r._deliveryTime > 0);
-    vals.push(items.length ? items.reduce((s, r) => s + r._deliveryTime, 0) / items.length : 0);
-  });
-  const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${schemes[p[0].dataIndex]}</b><br/>Среднее время доставки: <b>${vals[p[0].dataIndex].toFixed(1)} дн.</b>` },
-    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
-    xAxis: { type: 'category', data: schemes, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
-    yAxis: { type: 'value', name: 'дн.', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
-    series: [{
-      type: 'bar', data: vals, barMaxWidth: 50,
-      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#5856d6' }, { offset: 1, color: '#7c7af0' }]), borderRadius: [4,4,0,0] },
-      emphasis: { itemStyle: { color: '#3b39b5' } },
-      label: { show: true, position: 'top', formatter: p => p.value.toFixed(1) + ' дн.', fontSize: 10, color: '#86868b' }
-    }]
-  };
-  createChart('ch-delivery-scheme', option);
-}
-
 // ======================== INIT ========================
 function initDashboard() {
   populateFilters();
@@ -1711,10 +1627,6 @@ const CHART_DEFS = [
     help: { shows: 'Точечная диаграмма: ось X — цена (логарифмическая), ось Y — доля выкупа (%). Каждая точка — товар.',
             how: 'Наведите курсор на точку для названия, цены и выкупа. Общее направление облака показывает, падает ли выкуп с ростом цены.',
             why: 'Проверяет, чаще ли покупатели отказываются от дорогих товаров. Помогает оценить риск возвратов при повышении цены.' } },
-  { id: 'ch-delivery-scheme', title: 'Время доставки по схеме', desc: 'Сравнение среднего времени доставки между схемами FBO и FBS. Показывает, какая логистика быстрее.',
-    help: { shows: 'Столбчатая диаграмма: по оси X — схемы работы, по оси Y — среднее время доставки в днях.',
-            how: 'Наведите курсор на столбец для точного среднего времени. Подписи сверху показывают значение в днях.',
-            why: 'Сравнивает скорость доставки между логистическими моделями. Быстрая доставка повышает выкуп и лояльность покупателей.' } }
 ];
 
 function openChartHelp(id) {
@@ -1790,7 +1702,6 @@ document.addEventListener('keydown', e => {
 
 // ======================== START ========================
 buildUI();
-setupFileLoader();
 loadData();
 </script>
 </body>
