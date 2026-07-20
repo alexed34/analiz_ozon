@@ -130,7 +130,9 @@ const NUMERIC_FIELDS = {
   'Динамика суммы заказов, %': 'dynamics',
   'Доля затрат на Ozon, FBO, %': 'fboCost',
   'Доля затрат на Ozon, FBS, %': 'fbsCost',
-  'В корзину из поиска и каталога, %': 'cartFromSearch'
+  'В корзину из поиска и каталога, %': 'cartFromSearch',
+  'Вес': 'weight',
+  'Самая низкая цена, ?': 'lowestPrice'
 };
 
 function parseNum(v) {
@@ -190,6 +192,12 @@ function parseCSV(csv) {
     row._daysInStock = row['Дней без остатка, дни_num'] || 0;
     row._cartConv = row['В корзину из карточки, %_num'] || 0;
     row._volume = row['Объем товара, л_num'] || 0;
+    row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
+    row._weight = row['Вес_num'] || 0;
+    row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
+    row._fbsCost = row['Доля затрат на Ozon, FBS, %_num'] || 0;
+    row._dailySalesQty = row['Среднесуточные продажи, шт_num'] || 0;
+    row._lowestPrice = row['Самая низкая цена, ?_num'] || 0;
     rows.push(row);
   }
   return rows;
@@ -238,6 +246,12 @@ function parseXLSXData(wb) {
     row._daysInStock = row['Дней без остатка, дни_num'] || 0;
     row._cartConv = row['В корзину из карточки, %_num'] || 0;
     row._volume = row['Объем товара, л_num'] || 0;
+    row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
+    row._weight = row['Вес_num'] || 0;
+    row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
+    row._fbsCost = row['Доля затрат на Ozon, FBS, %_num'] || 0;
+    row._dailySalesQty = row['Среднесуточные продажи, шт_num'] || 0;
+    row._lowestPrice = row['Самая низкая цена, ?_num'] || 0;
     rows.push(row);
   }
   return rows;
@@ -402,6 +416,7 @@ function createChart(id, option) {
   const chart = echarts.init(dom, null, { renderer: 'canvas' });
   chart.setOption(option);
   charts[id] = chart;
+  chart.on('click', function(params) { handleChartClick(id, params); });
   window.addEventListener('resize', () => chart.resize());
   return chart;
 }
@@ -459,9 +474,9 @@ function handleChartClick(sourceId, params) {
   if (!name) return;
   let field = null;
   let value = name;
-  if (sourceId === 'ch-revenue-cat' || sourceId === 'ch-daily-sales') {
+  if (sourceId === 'ch-revenue-cat' || sourceId === 'ch-daily-sales' || sourceId === 'ch-category-dist' || sourceId === 'ch-buyout-cat' || sourceId === 'ch-price-box') {
     field = '_category';
-  } else if (sourceId === 'ch-top-brands' || sourceId === 'ch-lost-sales') {
+  } else if (sourceId === 'ch-top-brands' || sourceId === 'ch-lost-sales' || sourceId === 'ch-brand-orders' || sourceId === 'ch-ad-share' || sourceId === 'ch-cart-conv') {
     field = '_brand';
   } else if (sourceId === 'ch-super') {
     field = '_super';
@@ -509,6 +524,26 @@ function renderCharts() {
   renderCorrelation(d);
   // 12. Price x Category heatmap
   renderHeatmap(d);
+  // 13. Category SKU distribution
+  renderCategoryDist(d);
+  // 14. Top-20 brands by orders
+  renderBrandOrders(d);
+  // 15. Ad share by brand
+  renderAdShareByBrand(d);
+  // 16. Cart conversion by brand
+  renderCartConvByBrand(d);
+  // 17. Revenue dynamics histogram
+  renderDynamicsHist(d);
+  // 18. Buyout rate by category
+  renderBuyoutByCategory(d);
+  // 19. Scheme distribution
+  renderSchemeDist(d);
+  // 20. Super vs non-super
+  renderSuperCompare(d);
+  // 21. Weight vs Price scatter
+  renderWeightPrice(d);
+  // 22. Price boxplot by category
+  renderPriceBoxplot(d);
 }
 
 function renderAllCharts() {
@@ -891,6 +926,290 @@ function renderHeatmap(d) {
   createChart('ch-heatmap', option);
 }
 
+// ---------- 13. Category SKU Distribution ----------
+function renderCategoryDist(d) {
+  const map = {};
+  d.forEach(r => { const k = r._category || 'Другое'; map[k] = (map[k] || 0) + 1; });
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  const option = {
+    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>SKU: <b>${p.value}</b> (${p.percent}%)` },
+    series: [{
+      type: 'pie', radius: ['40%', '70%'],
+      data: entries.map(([k, v], i) => ({ name: k, value: v, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      label: { formatter: p => `${p.name}\n${p.value} (${p.percent}%)`, fontSize: 11 },
+      emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.15)' } }
+    }]
+  };
+  createChart('ch-category-dist', option);
+}
+
+// ---------- 14. Top-20 Brands by Orders ----------
+function renderBrandOrders(d) {
+  const map = {};
+  d.forEach(r => { const k = r._brand || 'Другое'; map[k] = (map[k] || 0) + r._orders; });
+  let entries = Object.entries(map).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 20).reverse();
+  if (!entries.length) return;
+  const labels = entries.map(e => e[0].length > 20 ? e[0].slice(0, 20) + '\u2026' : e[0]);
+  const values = entries.map(e => e[1]);
+  const fullNames = entries.map(e => e[0]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Продано: <b>${fmt(values[idx])} \u0448\u0442</b>`;
+    }},
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 20,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#ff9500' }, { offset: 1, color: '#ffb340' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#e68600' } },
+      label: { show: true, position: 'right', formatter: p => fmtM(p.value), fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-brand-orders', option);
+}
+
+// ---------- 15. Ad Share by Brand ----------
+function renderAdShareByBrand(d) {
+  const sums = {}, counts = {};
+  d.forEach(r => {
+    const k = r._brand || 'Другое';
+    if (r._adShare > 0) { sums[k] = (sums[k] || 0) + r._adShare; counts[k] = (counts[k] || 0) + 1; }
+  });
+  let entries = Object.entries(sums).map(([k, v]) => [k, v / counts[k]]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  if (!entries.length) return;
+  const labels = entries.map(e => e[0].length > 20 ? e[0].slice(0, 20) + '\u2026' : e[0]);
+  const values = entries.map(e => e[1]);
+  const fullNames = entries.map(e => e[0]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Доля рекламы: <b>${values[idx].toFixed(1)}%</b>`;
+    }},
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 20,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#af52de' }, { offset: 1, color: '#c47cf0' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#8b3abf' } },
+      label: { show: true, position: 'right', formatter: p => p.value.toFixed(1) + '%', fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-ad-share', option);
+}
+
+// ---------- 16. Cart Conversion by Brand ----------
+function renderCartConvByBrand(d) {
+  const sums = {}, counts = {};
+  d.forEach(r => {
+    const k = r._brand || 'Другое';
+    if (r._cartConv > 0) { sums[k] = (sums[k] || 0) + r._cartConv; counts[k] = (counts[k] || 0) + 1; }
+  });
+  let entries = Object.entries(sums).map(([k, v]) => [k, v / counts[k]]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  if (!entries.length) return;
+  const labels = entries.map(e => e[0].length > 20 ? e[0].slice(0, 20) + '\u2026' : e[0]);
+  const values = entries.map(e => e[1]);
+  const fullNames = entries.map(e => e[0]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Конверсия: <b>${values[idx].toFixed(1)}%</b>`;
+    }},
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 20,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#00c7be' }, { offset: 1, color: '#36c9a6' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#00a89e' } },
+      label: { show: true, position: 'right', formatter: p => p.value.toFixed(1) + '%', fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-cart-conv', option);
+}
+
+// ---------- 17. Revenue Dynamics Histogram ----------
+function renderDynamicsHist(d) {
+  let vals = d.filter(r => r._dynamics !== 0).map(r => r._dynamics);
+  if (!vals.length) return;
+  vals.sort((a, b) => a - b);
+  const lo = -100, hi = 200;
+  const clipped = vals.filter(v => v >= lo && v <= hi);
+  if (!clipped.length) return;
+  const bins = 15;
+  const step = (hi - lo) / bins;
+  const hist = Array(bins).fill(0);
+  const labels = [];
+  for (let i = 0; i < bins; i++) {
+    const l = lo + i * step;
+    const r = lo + (i + 1) * step;
+    labels.push((l > 0 ? '+' : '') + l.toFixed(0) + '%');
+  }
+  clipped.forEach(v => {
+    const idx = Math.min(Math.floor((v - lo) / step), bins - 1);
+    if (idx >= 0) hist[idx]++;
+  });
+  const n = clipped.length;
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)` },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(labels.length / 8)) }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: hist, barMaxWidth: 30,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#ff2d55' }, { offset: 1, color: '#ff6482' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#d6203f' } },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#34c759', type: 'dashed', width: 1.5 },
+        data: [{ xAxis: Math.floor((0 - lo) / step), label: { formatter: '0% (нет изменений)', position: 'insideEndTop', fontSize: 9, color: '#34c759' } }]
+      }
+    }]
+  };
+  createChart('ch-dynamics', option);
+}
+
+// ---------- 18. Buyout Rate by Category ----------
+function renderBuyoutByCategory(d) {
+  const sums = {}, counts = {};
+  d.forEach(r => {
+    const k = r._category || 'Другое';
+    if (r._buyout > 0) { sums[k] = (sums[k] || 0) + r._buyout; counts[k] = (counts[k] || 0) + 1; }
+  });
+  let entries = Object.entries(sums).map(([k, v]) => [k, v / counts[k]]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return;
+  const labels = entries.map(e => e[0]);
+  const values = entries.map(e => e[1]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${p[0].name}</b><br/>Выкуп: <b>${p[0].value.toFixed(1)}%</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: values, barMaxWidth: 40,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#30d158' }, { offset: 1, color: '#36c9a6' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#28a745' } },
+      label: { show: true, position: 'top', formatter: p => p.value.toFixed(1) + '%', fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-buyout-cat', option);
+}
+
+// ---------- 19. Scheme Distribution ----------
+function renderSchemeDist(d) {
+  const map = {};
+  d.forEach(r => { const k = r._scheme || 'Не указана'; map[k] = (map[k] || 0) + 1; });
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  const option = {
+    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>Товаров: <b>${p.value}</b> (${p.percent}%)` },
+    series: [{
+      type: 'pie', radius: ['40%', '70%'],
+      data: entries.map(([k, v], i) => ({ name: k, value: v, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      label: { formatter: p => `${p.name}\n${p.value} (${p.percent}%)`, fontSize: 11 },
+      emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.15)' } }
+    }]
+  };
+  createChart('ch-scheme', option);
+}
+
+// ---------- 20. Super vs Non-Super Comparison ----------
+function renderSuperCompare(d) {
+  const groups = {};
+  d.forEach(r => {
+    const k = r._super === 'Да' ? 'Super-товары' : 'Обычные';
+    if (!groups[k]) groups[k] = { rev: 0, ord: 0, conv: 0, cnt: 0 };
+    groups[k].rev += r._revenue;
+    groups[k].ord += r._orders;
+    if (r._cartConv > 0) { groups[k].conv += r._cartConv; groups[k].cnt++; }
+  });
+  const labels = ['Super-товары', 'Обычные'].filter(g => groups[g]);
+  if (!labels.length) return;
+  const revData = labels.map(g => groups[g].rev);
+  const ordData = labels.map(g => groups[g].ord);
+  const convData = labels.map(g => groups[g].cnt ? groups[g].conv / groups[g].cnt : 0);
+  const option = {
+    tooltip: { trigger: 'axis', formatter: p => {
+      const idx = p[0].dataIndex; const g = labels[idx];
+      return `<b>${g}</b><br/>Выручка: <b>${fmt(revData[idx])} \u20BD</b><br/>Продано: <b>${fmt(ordData[idx])} \u0448\u0442</b><br/>Конв. в корзину: <b>${convData[idx].toFixed(1)}%</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [
+      { name: 'Выручка, \u20BD', type: 'bar', data: revData, barMaxWidth: 30, itemStyle: { color: '#0071e3' }, emphasis: { itemStyle: { color: '#005bbf' } } },
+      { name: 'Продажи, \u0448\u0442', type: 'bar', data: ordData, barMaxWidth: 30, itemStyle: { color: '#34c759' }, emphasis: { itemStyle: { color: '#28a745' } } },
+      { name: 'Конв. корзина, %', type: 'bar', data: convData, barMaxWidth: 30, itemStyle: { color: '#af52de' }, emphasis: { itemStyle: { color: '#8b3abf' } } }
+    ],
+    legend: { bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 }
+  };
+  createChart('ch-super-compare', option);
+}
+
+// ---------- 21. Weight vs Price Scatter ----------
+function renderWeightPrice(d) {
+  const categories = [...new Set(d.map(r => r._category))].filter(Boolean);
+  const catColors = {};
+  categories.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
+  const series = categories.map(cat => {
+    const items = d.filter(r => r._category === cat && r._weight > 0 && r._price >= 30);
+    return {
+      name: cat, type: 'scatter',
+      data: items.map(r => ({ value: [r._weight, r._price], name: r._name })),
+      symbolSize: 6,
+      itemStyle: { color: catColors[cat], opacity: 0.6 },
+      emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
+    };
+  }).filter(s => s.data.length > 0);
+  if (!series.length) return;
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data.value; return `<b>${p.data.name || ''}</b><br/>${p.seriesName}<br/>Вес: <b>${d[0]} г</b><br/>Цена: <b>${fmt(d[1])} \u20BD</b>`;
+    }},
+    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'log', name: 'Вес, г', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Цена, \u20BD', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: series
+  };
+  createChart('ch-weight-price', option);
+}
+
+// ---------- 22. Price Boxplot by Category ----------
+function renderPriceBoxplot(d) {
+  const cats = [...new Set(d.map(r => r._category))].filter(Boolean);
+  const stickData = [];
+  const medData = [];
+  const labels = [];
+  cats.forEach(c => {
+    const prices = d.filter(r => r._category === c && r._price >= 30).map(r => r._price).sort((a, b) => a - b);
+    if (prices.length < 5) return;
+    labels.push(c);
+    const q1 = prices[Math.floor(prices.length * 0.25)];
+    const q2 = prices[Math.floor(prices.length * 0.5)];
+    const q3 = prices[Math.floor(prices.length * 0.75)];
+    const iqr = q3 - q1;
+    const lo = Math.max(prices[0], q1 - 1.5 * iqr);
+    const hi = Math.min(prices[prices.length - 1], q3 + 1.5 * iqr);
+    stickData.push([q1, q3, lo, hi]);
+    medData.push(q2);
+  });
+  if (!stickData.length) return;
+  const option = {
+    tooltip: { trigger: 'axis', formatter: p => {
+      const idx = p[0]?.dataIndex ?? 0;
+      const sd = stickData[idx];
+      const md = medData[idx];
+      return `<b>${labels[idx]}</b><br/>Мин: <b>${fmt(sd[2])} \u20BD</b><br/>Q1: <b>${fmt(sd[0])} \u20BD</b><br/>Медиана: <b>${fmt(md)} \u20BD</b><br/>Q3: <b>${fmt(sd[1])} \u20BD</b><br/>Макс: <b>${fmt(sd[3])} \u20BD</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', name: 'Цена, \u20BD', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [
+      { type: 'candlestick', data: stickData, barWidth: '50%', itemStyle: { color: '#0071e3', color0: '#0071e3', borderColor: '#005bbf', borderColor0: '#005bbf', borderWidth: 1.5 }, emphasis: { itemStyle: { color: '#40a9ff', color0: '#40a9ff' } } },
+      { type: 'scatter', data: medData, symbol: 'diamond', symbolSize: 12, itemStyle: { color: '#fff', borderColor: '#005bbf', borderWidth: 2 }, emphasis: { scale: 1.5 } }
+    ]
+  };
+  createChart('ch-price-box', option);
+}
+
 // ======================== INIT ========================
 function initDashboard() {
   populateFilters();
@@ -925,7 +1244,17 @@ const CHART_DEFS = [
   { id: 'ch-shows-visits', title: 'Показы ↔ Посещения', desc: 'Если товар часто показывают в поиске, заходят ли на его страницу? Помогает оценить, насколько привлекательны фото и название.' },
   { id: 'ch-lost-sales', title: 'Top-20 по упущенным продажам', desc: 'Какие бренды теряют больше всего денег из-за того, что товара нет на складе. Сигнал: завозить товар надо чаще и больше.' },
   { id: 'ch-correlation', title: 'Корреляционная матрица', desc: 'Связаны ли разные показатели между собой. Например: чем выше цена — тем реже выкупают? Чем больше рекламы — тем больше продаж?' },
-  { id: 'ch-heatmap', title: 'Heatmap «Цена × Категория»', desc: 'Сколько товаров каждой категории продаётся в разных ценовых диапазонах. Помогает выбрать правильную цену для своего товара.' }
+  { id: 'ch-heatmap', title: 'Heatmap «Цена × Категория»', desc: 'Сколько товаров каждой категории продаётся в разных ценовых диапазонах. Помогает выбрать правильную цену для своего товара.' },
+  { id: 'ch-category-dist', title: 'Доля SKU по типам кофе', desc: 'Сколько товаров каждого типа кофе представлено на площадке. Показывает насыщенность сегментов: растворимый, зерновой, молотый.' },
+  { id: 'ch-brand-orders', title: 'Top-20 брендов по количеству заказов', desc: 'Какие бренды лидируют по числу проданных единиц (не по выручке). Помогает отличить масс-маркет от премиума.' },
+  { id: 'ch-ad-share', title: 'Доля рекламных расходов по брендам', desc: 'Кто из брендов активнее вкладывается в рекламу. Высокая доля может означать как агрессивное продвижение, так и неэффективность.' },
+  { id: 'ch-cart-conv', title: 'Конверсия в корзину по брендам', desc: 'Какой процент посетителей карточки добавляет товар в корзину. Косвенный показатель качества контента (фото, описание).' },
+  { id: 'ch-dynamics', title: 'Динамика выручки: распределение', desc: 'Как изменилась выручка по сравнению с прошлым периодом. Зелёная линия — порог 0% (без изменений).' },
+  { id: 'ch-buyout-cat', title: 'Доля выкупа по типам кофе', desc: 'Процент заказанных товаров, которые не вернули и не отменили. Показывает лояльность покупателей в каждом сегменте.' },
+  { id: 'ch-scheme', title: 'Распределение по схеме работы', desc: 'Какая логистическая модель преобладает: FBO (склад Ozon) или FBS (склад продавца).' },
+  { id: 'ch-super-compare', title: 'Super-товары vs Обычные', desc: 'Сравнение выручки, продаж и конверсии между товарами со статусом Super и обычными.' },
+  { id: 'ch-weight-price', title: 'Вес ↔ Цена по типам кофе', desc: 'Зависимость цены от веса упаковки. Раскраска по типу кофе показывает разницу в цене за грамм между сегментами.' },
+  { id: 'ch-price-box', title: 'Boxplot цен по типам кофе', desc: 'Разброс цен внутри каждого типа кофе: медиана, квартили, выбросы. Помогает понять ценовое позиционирование.' }
 ];
 
 function buildUI() {

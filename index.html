@@ -15,6 +15,12 @@ p{font-size:18px;color:#86868b;margin-bottom:40px;line-height:1.5}
 a.dashboard{background:#0071e3;color:#fff;box-shadow:0 4px 16px rgba(0,113,227,.3)}
 a.dashboard:hover{background:#0077ed;transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,113,227,.4)}
 a.dashboard svg{width:20px;height:20px;fill:currentColor}
+.feedback{margin-top:48px;text-align:left;background:#fff;border-radius:16px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.feedback h2{font-size:22px;font-weight:600;margin-bottom:20px;text-align:center}
+.feedback input,.feedback textarea{width:100%;padding:12px 16px;border:1px solid #d2d2d7;border-radius:10px;font-size:15px;font-family:inherit;margin-bottom:12px;outline:none;transition:border-color .2s}
+.feedback input:focus,.feedback textarea:focus{border-color:#0071e3}
+.feedback button{width:100%;padding:14px;border:none;border-radius:12px;background:#0071e3;color:#fff;font-size:16px;font-weight:500;cursor:pointer;transition:background .2s}
+.feedback button:hover{background:#0077ed}
 footer{margin-top:60px;font-size:13px;color:#86868b}
 </style>
 </head>
@@ -23,11 +29,38 @@ footer{margin-top:60px;font-size:13px;color:#86868b}
   <h1>Аналитика Ozon</h1>
   <p>Дашборд по рынку кофе на Ozon</p>
   <div class="links">
-    <a class="dashboard" href="dashboard.html">
+    <a class="dashboard" href="dashboard.html" style="background:#0071e3">
       <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-      Открыть дашборд
+      Аналитика Кофе июль 2027
     </a>
   </div>
+  <section class="feedback">
+    <h2>Обратная связь</h2>
+    <form id="feedback-form" action="https://api.web3forms.com/submit" method="POST">
+      <input type="hidden" name="access_key" value="ВАШ_КЛЮЧ_С_WEB3FORMS">
+      <input type="text" name="Имя" placeholder="Ваше имя" required>
+      <input type="email" name="Email" placeholder="Email для ответа" required>
+      <textarea name="Сообщение" rows="4" placeholder="Сообщение или вопрос по дашборду..." required></textarea>
+      <input type="checkbox" name="botcheck" style="display:none">
+      <button type="submit">Отправить</button>
+    </form>
+    <script>
+document.getElementById('feedback-form').onsubmit=async function(e){
+  e.preventDefault();
+  const btn=this.querySelector('button');
+  btn.disabled=true; btn.textContent='Отправка...';
+  const fd=new FormData(this);
+  fd.set('access_key','ВАШ_КЛЮЧ_С_WEB3FORMS');
+  try{
+    const r=await fetch(this.action,{method:'POST',body:fd});
+    const d=await r.json();
+    this.innerHTML=d.success
+      ?'<p style="text-align:center;font-size:18px;color:#1d1d1f;padding:20px 0">Спасибо за сообщение!</p>'
+      :'<p style="text-align:center;font-size:18px;color:#e33;padding:20px 0">Ошибка. Попробуйте ещё раз.</p>';
+  }catch(e){this.innerHTML='<p style="text-align:center;font-size:18px;color:#e33;padding:20px 0">Ошибка сети.</p>'}
+}
+</script>
+  </section>
   <footer>На основе данных Ozon</footer>
 </div>
 </body>
