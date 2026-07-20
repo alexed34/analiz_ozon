@@ -150,19 +150,14 @@ const NUMERIC_FIELDS = {
   'Среднесуточные продажи, шт': 'dailySalesQty',
   'Показы в поиске и каталоге': 'impressions',
   'Посещения карточки товара': 'visits',
-  'В корзину из карточки, %': 'cartConv',
-  'Доля рекламных расходов, %': 'adShare',
   'Доля выкупа, %': 'buyoutRate',
-  'Дней без остатка, дни': 'daysOutOfStock',
   'Объем товара, л': 'volume',
-  'Среднее время доставки': 'deliveryTime',
-  'Среднее время доставки, дн': 'deliveryTime',
+  'Время доставки': 'deliveryTime',
   'Динамика суммы заказов, %': 'dynamics',
   'Доля затрат на Ozon, FBO, %': 'fboCost',
   'Доля затрат на Ozon, FBS, %': 'fbsCost',
   'В корзину из поиска и каталога, %': 'cartFromSearch',
-  'Вес': 'weight',
-  'Самая низкая цена, ?': 'lowestPrice'
+  'Самые низкие цены товара': 'lowestPrice'
 };
 
 function parseNum(v) {
@@ -234,16 +229,29 @@ function parseCSV(csv) {
   return rows;
 }
 
+let DATA_PERIOD = '28 дней';
+
 function parseXLSXData(wb) {
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+  const json = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, rawNumbers: true, defval: '' });
   if (json.length < 3) return [];
-  let headers = json[0].map(h => String(h || '').trim());
+  DATA_PERIOD = '28 дней';
+  for (const r of json.slice(0, 3)) {
+    const cell = r && r[0] != null ? String(r[0]) : '';
+    if (cell.startsWith('Период:')) {
+      DATA_PERIOD = cell.replace('Период:', '').trim();
+      break;
+    }
+  }
+  let headerIdx = json.findIndex(row => Array.isArray(row) && row.some(c => String(c || '').trim() === 'Название товара'));
+  if (headerIdx < 0) headerIdx = 0;
+  let headers = json[headerIdx].map(h => String(h || '').trim());
   headers = headers.map(h => h.replace(/\u20BD/g, '?'));
   const rows = [];
-  for (let i = 2; i < json.length; i++) {
+  for (let i = headerIdx + 1; i < json.length; i++) {
     const vals = json[i];
     if (!vals || vals.length < 3) continue;
+    if (vals.every(v => v == null || v === '' || v === '—')) continue;
     const row = {};
     headers.forEach((h, j) => {
       let v = vals[j];
@@ -261,9 +269,10 @@ function parseXLSXData(wb) {
       }
     });
     row._name = row['Название товара'] || '';
+    if (!row._name || row._name === '—' || row._name === '-') continue;
     row._brand = row['Бренд'] || '';
     row._category = row['Категория 3 уровня'] || '';
-    row._scheme = row['Схема работы'] || '';
+    row._scheme = row['Схема работы'] || row['Доля выкупа'] || '';
     row._super = row['Super-товар'] || '';
     row._revenue = row['Заказано на сумму, ?_num'] || 0;
     row._orders = row['Заказано товаров_num'] || 0;
@@ -273,20 +282,57 @@ function parseXLSXData(wb) {
     row._impressions = row['Показы в поиске и каталоге_num'] || 0;
     row._visits = row['Посещения карточки товара_num'] || 0;
     row._buyout = row['Доля выкупа, %_num'] || 0;
-    row._adShare = row['Доля рекламных расходов, %_num'] || 0;
-    row._daysInStock = row['Дней без остатка, дни_num'] || 0;
-    row._cartConv = row['В корзину из карточки, %_num'] || 0;
+    row._adShare = 0;
+    row._daysInStock = row['Среднесуточные продажи, шт_num'] || 0;
+    row._cartConv = 0;
     row._volume = row['Объем товара, л_num'] || 0;
-    row._deliveryTime = row['Среднее время доставки_num'] || row['Среднее время доставки, дн_num'] || 0;
+    row._deliveryTime = row['Время доставки_num'] || 0;
     row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
-    row._weight = row['Вес_num'] || 0;
+    row._weight = 0;
     row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
     row._fbsCost = row['Доля затрат на Ozon, FBS, %_num'] || 0;
     row._dailySalesQty = row['Среднесуточные продажи, шт_num'] || 0;
-    row._lowestPrice = row['Самая низкая цена, ?_num'] || 0;
+    row._lowestPrice = row['Самые низкие цены товара_num'] || 0;
     rows.push(row);
   }
   return rows;
+}
+
+// ======================== INDEXEDDB CACHE ========================
+const DB_NAME = 'coffeeDashboard';
+const DB_STORE = 'dataset';
+const DB_CACHE_KEY = 'main_v2';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function getCached() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(DB_CACHE_KEY);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function setCached(payload) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(payload, DB_CACHE_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }
 
 async function loadData() {
@@ -296,14 +342,40 @@ async function loadData() {
     msg.innerHTML = '<div class="chart-card" style="grid-column:1/-1;padding:40px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠</div><div class="chart-title" style="font-size:18px;margin-bottom:8px">Локальный файл не загрузится через file://</div><div class="chart-desc" style="font-size:14px;line-height:1.6">Современные браузеры блокируют fetch() для локальных файлов.<br><br><b>Вариант A</b> — Python (установлен):<br><code style="background:#f0f0f0;padding:2px 8px;border-radius:4px">python -m http.server 8080</code><br>→ Откройте <a href="http://localhost:8080" target="_blank">http://localhost:8080</a><br><br><b>Вариант B</b> — Node.js:<br><code style="background:#f0f0f0;padding:2px 8px;border-radius:4px">npx serve .</code><br><br><b>Вариант C</b> — VS Code: установите расширение Live Server, кликните правой кнопкой на dashboard.html → Open with Live Server</div></div>';
     return;
   }
+  let cached = null;
+  try { cached = await getCached(); } catch (_) { cached = null; }
   try {
-    const resp = await fetch('data.xlsx');
+    const reqHeaders = {};
+    if (cached && cached.lastModified) reqHeaders['If-Modified-Since'] = cached.lastModified;
+    let resp;
+    try {
+      resp = await fetch('data.xlsx', { headers: reqHeaders });
+    } catch (netErr) {
+      if (cached && cached.data && cached.data.length) {
+        allData = cached.data;
+        DATA_PERIOD = cached.period || DATA_PERIOD;
+        document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · ' + DATA_PERIOD + ' · (офлайн, из кэша)';
+        initDashboard();
+        return;
+      }
+      throw netErr;
+    }
+    if (resp.status === 304 && cached && cached.data && cached.data.length) {
+      allData = cached.data;
+      DATA_PERIOD = cached.period || DATA_PERIOD;
+      document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · ' + DATA_PERIOD + ' · загружено из кэша';
+      initDashboard();
+      return;
+    }
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const buf = await resp.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
     allData = parseXLSXData(wb);
     if (allData.length === 0) throw new Error('Нет данных');
-    document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · 28 дней · Интерактивная аналитика';
+    const lm = resp.headers.get('last-modified');
+    try { await setCached({ data: allData, lastModified: lm, period: DATA_PERIOD }); } catch (_) {}
+    const label = (cached && cached.data && cached.data.length) ? 'данные обновлены' : 'Интерактивная аналитика';
+    document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · ' + DATA_PERIOD + ' · ' + label;
     initDashboard();
   } catch (e) {
     document.getElementById('subtitle').textContent = 'Ошибка загрузки data.xlsx — ' + e.message + '. Запустите локальный сервер.';
