@@ -252,7 +252,7 @@ function parseXLSXData(wb) {
 // ======================== INDEXEDDB CACHE ========================
 const DB_NAME = 'coffeeDashboard';
 const DB_STORE = 'dataset';
-const DB_CACHE_KEY = 'main_v3';
+const DB_CACHE_KEY = 'main_12ddcac';
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -300,7 +300,7 @@ async function loadData() {
     if (cached && cached.lastModified) reqHeaders['If-Modified-Since'] = cached.lastModified;
     let resp;
     try {
-      resp = await fetch('data.xlsx', { headers: reqHeaders });
+      resp = await fetch('data.xlsx?v=12ddcac', { headers: reqHeaders });
     } catch (netErr) {
       if (cached && cached.data && cached.data.length) {
         allData = cached.data;
