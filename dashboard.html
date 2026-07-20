@@ -45,6 +45,23 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 .chart-actions{display:flex;gap:4px}
 .chart-actions button{width:28px;height:28px;border:none;border-radius:8px;background:rgba(0,0,0,.04);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .2s;color:#86868b}
 .chart-actions button:hover{background:rgba(0,0,0,.1);color:#1d1d1f}
+.chart-actions button.help-btn{color:#0071e3;font-weight:700;font-size:14px}
+.chart-actions button.help-btn:hover{background:rgba(0,113,227,.12);color:#0071e3}
+.help-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:10000;padding:20px}
+.help-modal.open{display:flex}
+.help-modal-box{background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:28px 28px 24px;animation:helpPop .18s ease}
+@keyframes helpPop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.help-modal-title{font-size:19px;font-weight:700;color:#1d1d1f;margin-bottom:4px;letter-spacing:-.3px}
+.help-modal-sub{font-size:12px;color:#0071e3;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+.help-modal-section{margin-bottom:16px}
+.help-modal-section h4{font-size:13px;font-weight:600;color:#1d1d1f;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.help-modal-section h4::before{content:'';width:6px;height:6px;border-radius:50%;background:#0071e3;display:inline-block}
+.help-modal-section p{font-size:13px;line-height:1.6;color:#515154;margin:0}
+.help-modal-close{margin-top:8px;width:100%;padding:11px;border:none;border-radius:12px;background:#0071e3;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s;font-family:inherit}
+.help-modal-close:hover{background:#0077ed}
+.help-modal-close-x{position:absolute;top:18px;right:20px;width:32px;height:32px;border:none;background:rgba(0,0,0,.05);border-radius:50%;font-size:18px;color:#86868b;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.help-modal-close-x:hover{background:rgba(0,0,0,.1);color:#1d1d1f}
+.help-modal-box-wrap{position:relative}
 .chart-container{width:100%;height:360px}
 .chart-container-full{width:100%;height:calc(100vh - 300px);min-height:500px}
 .fullscreen-active{position:fixed!important;top:0;left:0;width:100vw;height:100vh;z-index:9999;padding:24px;background:#f5f5f7;border-radius:0!important;overflow:auto}
@@ -68,7 +85,7 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 
 <div class="filters-bar" id="filtersBar">
   <div class="filters-top">
-    <input type="text" id="filterSearch" placeholder="Поиск товара…" oninput="applyFilters()">
+    <input type="text" id="filterSearch" placeholder="Поиск товара…" oninput="debouncedFilter()">
     <select id="filterBrand" onchange="applyFilters()"><option value="">Все бренды</option></select>
     <select id="filterCategory" onchange="applyFilters()"><option value="">Все категории</option></select>
     <select id="filterScheme" onchange="applyFilters()"><option value="">Все схемы</option></select>
@@ -105,6 +122,18 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 <div class="charts-grid" id="chartsGrid"></div>
 </div>
 
+<div class="help-modal" id="helpModal" onclick="if(event.target===this)closeChartHelp()">
+  <div class="help-modal-box help-modal-box-wrap">
+    <button class="help-modal-close-x" onclick="closeChartHelp()" title="Закрыть">×</button>
+    <div class="help-modal-title" id="helpTitle"></div>
+    <div class="help-modal-sub" id="helpSub"></div>
+    <div class="help-modal-section"><h4>Что показывает</h4><p id="helpShows"></p></div>
+    <div class="help-modal-section"><h4>Как пользоваться</h4><p id="helpHow"></p></div>
+    <div class="help-modal-section"><h4>Для чего нужен</h4><p id="helpWhy"></p></div>
+    <button class="help-modal-close" onclick="closeChartHelp()">Понятно</button>
+  </div>
+</div>
+
 <script>
 // ======================== DATA ========================
 let allData = [];
@@ -127,6 +156,7 @@ const NUMERIC_FIELDS = {
   'Дней без остатка, дни': 'daysOutOfStock',
   'Объем товара, л': 'volume',
   'Среднее время доставки': 'deliveryTime',
+  'Среднее время доставки, дн': 'deliveryTime',
   'Динамика суммы заказов, %': 'dynamics',
   'Доля затрат на Ozon, FBO, %': 'fboCost',
   'Доля затрат на Ozon, FBS, %': 'fbsCost',
@@ -192,6 +222,7 @@ function parseCSV(csv) {
     row._daysInStock = row['Дней без остатка, дни_num'] || 0;
     row._cartConv = row['В корзину из карточки, %_num'] || 0;
     row._volume = row['Объем товара, л_num'] || 0;
+    row._deliveryTime = row['Среднее время доставки_num'] || row['Среднее время доставки, дн_num'] || 0;
     row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
     row._weight = row['Вес_num'] || 0;
     row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
@@ -246,6 +277,7 @@ function parseXLSXData(wb) {
     row._daysInStock = row['Дней без остатка, дни_num'] || 0;
     row._cartConv = row['В корзину из карточки, %_num'] || 0;
     row._volume = row['Объем товара, л_num'] || 0;
+    row._deliveryTime = row['Среднее время доставки_num'] || row['Среднее время доставки, дн_num'] || 0;
     row._dynamics = row['Динамика суммы заказов, %_num'] || 0;
     row._weight = row['Вес_num'] || 0;
     row._fboCost = row['Доля затрат на Ozon, FBO, %_num'] || 0;
@@ -276,6 +308,60 @@ async function loadData() {
   } catch (e) {
     document.getElementById('subtitle').textContent = 'Ошибка загрузки data.xlsx — ' + e.message + '. Запустите локальный сервер.';
   }
+}
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const buf = e.target.result;
+      let rows = [];
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        const text = new TextDecoder('utf-8').decode(new Uint8Array(buf));
+        rows = parseCSV(text);
+      } else {
+        const wb = XLSX.read(buf, { type: 'array' });
+        rows = parseXLSXData(wb);
+      }
+      if (!rows.length) throw new Error('Файл пуст или неверного формата');
+      allData = rows;
+      filteredData = allData;
+      charts = {}; chartInitialized = {};
+      document.querySelectorAll('.chart-container').forEach(c => { if (c.id && charts[c.id]) { charts[c.id].dispose(); delete charts[c.id]; } });
+      document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · загружено из файла · Интерактивная аналитика';
+      populateFilters();
+      applyFilters();
+    } catch (err) {
+      alert('Не удалось загрузить файл: ' + err.message);
+    }
+  };
+  if (file.name.toLowerCase().endsWith('.csv')) reader.readAsArrayBuffer(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function setupFileLoader() {
+  const bar = document.getElementById('filtersBar');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  wrap.innerHTML = `
+    <label class="filter-btn filter-btn-reset" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+      📁 Загрузить свой файл
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+    </label>
+    <span id="dropHint" style="font-size:11px;color:#86868b">Перетащите .xlsx или .csv сюда</span>
+  `;
+  bar.appendChild(wrap);
+  const input = wrap.querySelector('#fileInput');
+  input.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  const hint = wrap.querySelector('#dropHint');
+  ['dragover', 'dragenter'].forEach(ev => hint.addEventListener(ev, e => { e.preventDefault(); hint.style.color = '#0071e3'; hint.textContent = 'Отпустите файл…'; }));
+  ['dragleave', 'dragend'].forEach(ev => hint.addEventListener(ev, e => { e.preventDefault(); hint.style.color = '#86868b'; hint.textContent = 'Перетащите .xlsx или .csv сюда'; }));
+  hint.addEventListener('drop', e => {
+    e.preventDefault();
+    hint.style.color = '#86868b';
+    hint.textContent = 'Перетащите .xlsx или .csv сюда';
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
 }
 
 // ======================== FILTERS ========================
@@ -322,6 +408,12 @@ function applyFilters() {
   saveFilterState();
   renderAllCharts();
   renderKPI();
+}
+
+let _filterTimer = null;
+function debouncedFilter() {
+  if (_filterTimer) clearTimeout(_filterTimer);
+  _filterTimer = setTimeout(applyFilters, 250);
 }
 
 function resetFilters() {
@@ -412,13 +504,13 @@ const LIGHT_BG = 'rgba(0,0,0,.03)';
 function createChart(id, option) {
   const dom = document.getElementById(id);
   if (!dom) return;
-  if (charts[id]) charts[id].dispose();
-  const chart = echarts.init(dom, null, { renderer: 'canvas' });
-  chart.setOption(option);
-  charts[id] = chart;
-  chart.on('click', function(params) { handleChartClick(id, params); });
-  window.addEventListener('resize', () => chart.resize());
-  return chart;
+  if (!charts[id]) {
+    charts[id] = echarts.init(dom, null, { renderer: 'canvas' });
+    charts[id].on('click', function(params) { handleChartClick(id, params); });
+    window.addEventListener('resize', () => charts[id].resize());
+  }
+  charts[id].setOption(option, { notMerge: true });
+  return charts[id];
 }
 
 function createChartCard(containerId, chartId, title, desc, fullscreen) {
@@ -544,14 +636,27 @@ function renderCharts() {
   renderWeightPrice(d);
   // 22. Price boxplot by category
   renderPriceBoxplot(d);
+  // 23. Dynamics waterfall
+  renderDynamicsWaterfall(d);
+  // 24. Shows vs Revenue
+  renderShowsRevenue(d);
+  // 25. FBO/FBS cost
+  renderFboFbsCost(d);
+  // 26. Days out-of-stock histogram
+  renderDaysOosHist(d);
+  // 27. Weight category donut
+  renderWeightDonut(d);
+  // 28. Buyout vs Price
+  renderBuyoutPrice(d);
+  // 29. Delivery time by scheme
+  renderDeliveryByScheme(d);
+  CHART_DEFS.forEach(c => {
+    const card = document.getElementById('card-' + c.id);
+    if (card) card.style.display = charts[c.id] ? '' : 'none';
+  });
 }
 
 function renderAllCharts() {
-  Object.keys(charts).forEach(id => {
-    if (charts[id]) charts[id].dispose();
-  });
-  charts = {};
-  chartInitialized = {};
   renderCharts();
 }
 
@@ -1210,6 +1315,195 @@ function renderPriceBoxplot(d) {
   createChart('ch-price-box', option);
 }
 
+// ---------- 23. Waterfall: Top Dynamics ----------
+function renderDynamicsWaterfall(d) {
+  const items = d.map(r => ({ name: r._name, val: r._dynamics }))
+    .filter(r => r.val !== 0)
+    .sort((a, b) => b.val - a.val)
+    .slice(0, 12);
+  if (!items.length) return;
+  const base = [];
+  const rise = [], fall = [];
+  let running = 0;
+  items.forEach(it => {
+    if (it.val >= 0) {
+      base.push(running);
+      rise.push(it.val);
+      fall.push('-');
+      running += it.val;
+    } else {
+      running += it.val;
+      base.push(running);
+      rise.push('-');
+      fall.push(-it.val);
+    }
+  });
+  const names = items.map(r => r.name.length > 16 ? r.name.slice(0, 16) + '…' : r.name);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex;
+      return `<b>${items[idx].name}</b><br/>Динамика: <b>${items[idx].val > 0 ? '+' : ''}${items[idx].val.toFixed(1)}%</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'category', data: names, axisLabel: { rotate: 45, fontSize: 9, interval: 0, overflow: 'truncate', width: 70 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { formatter: v => (v>0?'+':'') + v + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [
+      { name: 'base', type: 'bar', stack: 't', itemStyle: { color: 'transparent' }, emphasis: { itemStyle: { color: 'transparent' } }, data: base },
+      { name: 'Рост', type: 'bar', stack: 't', data: rise, barMaxWidth: 30, itemStyle: { color: '#34c759', borderRadius: [3,3,0,0] }, emphasis: { itemStyle: { color: '#28a745' } } },
+      { name: 'Падение', type: 'bar', stack: 't', data: fall, barMaxWidth: 30, itemStyle: { color: '#ff3b30', borderRadius: [0,0,3,3] }, emphasis: { itemStyle: { color: '#d62d20' } } }
+    ],
+    legend: { show: false }
+  };
+  createChart('ch-dynamics-waterfall', option);
+}
+
+// ---------- 24. Shows vs Revenue Scatter ----------
+function renderShowsRevenue(d) {
+  const points = d.filter(r => r._impressions > 0 && r._revenue > 0);
+  if (!points.length) return;
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data; return `<b>${d.name || ''}</b><br/>Показы: <b>${fmt(d[0])}</b><br/>Выручка: <b>${fmt(d[1])} ₽</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Показы', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Выручка, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: points.map(r => ({ value: [r._impressions, r._revenue], name: r._name })), symbolSize: 5,
+      itemStyle: { color: 'rgba(0,199,190,0.5)' },
+      emphasis: { itemStyle: { color: '#00c7be' }, scale: 1.5 }
+    }]
+  };
+  createChart('ch-shows-revenue', option);
+}
+
+// ---------- 25. FBO vs FBS Cost (grouped bar) ----------
+function renderFboFbsCost(d) {
+  const schemes = [...new Set(d.map(r => r._scheme))].filter(Boolean);
+  if (!schemes.length) return;
+  const fbo = [], fbs = [];
+  schemes.forEach(s => {
+    const items = d.filter(r => r._scheme === s);
+    const fboItems = items.filter(r => r._fboCost > 0);
+    const fbsItems = items.filter(r => r._fbsCost > 0);
+    fbo.push(fboItems.length ? fboItems.reduce((s, r) => s + r._fboCost, 0) / fboItems.length : 0);
+    fbs.push(fbsItems.length ? fbsItems.reduce((s, r) => s + r._fbsCost, 0) / fbsItems.length : 0);
+  });
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const idx = p[0].dataIndex;
+      return `<b>${schemes[idx]}</b><br/>FBO: <b>${fbo[idx].toFixed(1)}%</b><br/>FBS: <b>${fbs[idx].toFixed(1)}%</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 30, bottom: 20, containLabel: true },
+    xAxis: { type: 'category', data: schemes, axisLabel: { fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [
+      { name: 'FBO', type: 'bar', data: fbo, barMaxWidth: 40, itemStyle: { color: '#0071e3', borderRadius: [4,4,0,0] }, emphasis: { itemStyle: { color: '#005bbf' } } },
+      { name: 'FBS', type: 'bar', data: fbs, barMaxWidth: 40, itemStyle: { color: '#ff9500', borderRadius: [4,4,0,0] }, emphasis: { itemStyle: { color: '#e68600' } } }
+    ],
+    legend: { top: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 }
+  };
+  createChart('ch-fbo-fbs', option);
+}
+
+// ---------- 26. Days Out-of-Stock Histogram ----------
+function renderDaysOosHist(d) {
+  let vals = d.map(r => r._daysInStock).filter(v => v > 0);
+  if (!vals.length) return;
+  vals.sort((a, b) => a - b);
+  const maxV = Math.max(28, Math.ceil(vals[vals.length - 1]));
+  const bins = 14;
+  const step = maxV / bins;
+  const hist = Array(bins).fill(0);
+  const labels = [];
+  for (let i = 0; i < bins; i++) {
+    const l = Math.round(i * step);
+    const r = Math.round((i + 1) * step);
+    labels.push(l + '–' + r);
+  }
+  vals.forEach(v => {
+    const idx = Math.min(Math.floor(v / step), bins - 1);
+    hist[idx]++;
+  });
+  const n = vals.length;
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name} дн.<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)` },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(labels.length / 7)) }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: hist, barMaxWidth: 30,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#ff3b30' }, { offset: 1, color: '#ff6b61' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#d62d20' } }
+    }]
+  };
+  createChart('ch-oos-hist', option);
+}
+
+// ---------- 27. Weight Category Donut ----------
+function renderWeightDonut(d) {
+  const wcol = d[0] && d[0]['Категория_веса'] ? 'Категория_веса' : null;
+  if (!wcol) return;
+  const map = {};
+  d.forEach(r => { const k = r[wcol] || 'Не указана'; map[k] = (map[k] || 0) + 1; });
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return;
+  const option = {
+    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>Товаров: <b>${p.value}</b> (${p.percent}%)` },
+    series: [{
+      type: 'pie', radius: ['45%', '72%'],
+      data: entries.map(([k, v], i) => ({ name: k, value: v, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      label: { formatter: p => `${p.name}\n${p.value} (${p.percent}%)`, fontSize: 11 },
+      emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.15)' } }
+    }]
+  };
+  createChart('ch-weight-donut', option);
+}
+
+// ---------- 28. Buyout vs Price Scatter ----------
+function renderBuyoutPrice(d) {
+  const points = d.filter(r => r._price >= 30 && r._buyout > 0);
+  if (!points.length) return;
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data; return `<b>${d.name || ''}</b><br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Выкуп: <b>${d[1].toFixed(1)}%</b>`;
+    }},
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Цена, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Выкуп, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: points.map(r => ({ value: [r._price, r._buyout], name: r._name })), symbolSize: 5,
+      itemStyle: { color: 'rgba(52,199,89,0.5)' },
+      emphasis: { itemStyle: { color: '#34c759' }, scale: 1.5 }
+    }]
+  };
+  createChart('ch-buyout-price', option);
+}
+
+// ---------- 29. Delivery Time by Scheme ----------
+function renderDeliveryByScheme(d) {
+  const schemes = [...new Set(d.map(r => r._scheme))].filter(Boolean);
+  if (!schemes.length) return;
+  const vals = [];
+  schemes.forEach(s => {
+    const items = d.filter(r => r._scheme === s && r._deliveryTime > 0);
+    vals.push(items.length ? items.reduce((s, r) => s + r._deliveryTime, 0) / items.length : 0);
+  });
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${schemes[p[0].dataIndex]}</b><br/>Среднее время доставки: <b>${vals[p[0].dataIndex].toFixed(1)} дн.</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'category', data: schemes, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', name: 'дн.', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'bar', data: vals, barMaxWidth: 50,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#5856d6' }, { offset: 1, color: '#7c7af0' }]), borderRadius: [4,4,0,0] },
+      emphasis: { itemStyle: { color: '#3b39b5' } },
+      label: { show: true, position: 'top', formatter: p => p.value.toFixed(1) + ' дн.', fontSize: 10, color: '#86868b' }
+    }]
+  };
+  createChart('ch-delivery-scheme', option);
+}
+
 // ======================== INIT ========================
 function initDashboard() {
   populateFilters();
@@ -1233,29 +1527,141 @@ function populateFilters() {
 
 // ======================== BUILD UI ========================
 const CHART_DEFS = [
-  { id: 'ch-revenue-cat', title: 'Выручка по категориям кофе', desc: 'Какой тип кофе приносит больше денег — растворимый, зерновой или молотый. Помогает понять, на чём стоит сфокусироваться.' },
-  { id: 'ch-top-brands', title: 'Top-20 брендов по выручке', desc: 'Какие бренды кофе зарабатывают больше всего на Ozon. Полезно для оценки конкуренции и поиска популярных поставщиков.' },
-  { id: 'ch-price-dist', title: 'Распределение цен', desc: 'Сколько товаров стоят дёшево, а сколько — дорого. Помогает понять, в каком ценовом диапазоне больше всего предложений.' },
-  { id: 'ch-price-sales', title: 'Цена ↔ Продажи', desc: 'Влияет ли цена на количество продаж. Обычно дорогие товары покупают реже — график проверяет это правило на практике.' },
-  { id: 'ch-bubble', title: 'Bubble Chart', desc: 'Сравнение товаров по трём показателям сразу: цена, выручка и количество продаж. Размер кружка — сколько продали, цвет — тип кофе.' },
-  { id: 'ch-pareto', title: 'ABC-анализ (Pareto)', desc: 'Какие товары приносят основную долю выручки. По правилу Парето 20% товаров часто дают 80% денег — здесь это легко проверить.' },
-  { id: 'ch-daily-sales', title: 'Среднесуточные продажи по категориям', desc: 'Сколько в среднем в день зарабатывает каждая категория кофе. Помогает оценить ежедневный спрос на разные типы кофе.' },
-  { id: 'ch-funnel', title: 'Воронка продаж', desc: 'Путь покупателя: от показа товара до покупки. Видно, на каком этапе теряется больше всего людей — и где нужно улучшать.' },
-  { id: 'ch-shows-visits', title: 'Показы ↔ Посещения', desc: 'Если товар часто показывают в поиске, заходят ли на его страницу? Помогает оценить, насколько привлекательны фото и название.' },
-  { id: 'ch-lost-sales', title: 'Top-20 по упущенным продажам', desc: 'Какие бренды теряют больше всего денег из-за того, что товара нет на складе. Сигнал: завозить товар надо чаще и больше.' },
-  { id: 'ch-correlation', title: 'Корреляционная матрица', desc: 'Связаны ли разные показатели между собой. Например: чем выше цена — тем реже выкупают? Чем больше рекламы — тем больше продаж?' },
-  { id: 'ch-heatmap', title: 'Heatmap «Цена × Категория»', desc: 'Сколько товаров каждой категории продаётся в разных ценовых диапазонах. Помогает выбрать правильную цену для своего товара.' },
-  { id: 'ch-category-dist', title: 'Доля SKU по типам кофе', desc: 'Сколько товаров каждого типа кофе представлено на площадке. Показывает насыщенность сегментов: растворимый, зерновой, молотый.' },
-  { id: 'ch-brand-orders', title: 'Top-20 брендов по количеству заказов', desc: 'Какие бренды лидируют по числу проданных единиц (не по выручке). Помогает отличить масс-маркет от премиума.' },
-  { id: 'ch-ad-share', title: 'Доля рекламных расходов по брендам', desc: 'Кто из брендов активнее вкладывается в рекламу. Высокая доля может означать как агрессивное продвижение, так и неэффективность.' },
-  { id: 'ch-cart-conv', title: 'Конверсия в корзину по брендам', desc: 'Какой процент посетителей карточки добавляет товар в корзину. Косвенный показатель качества контента (фото, описание).' },
-  { id: 'ch-dynamics', title: 'Динамика выручки: распределение', desc: 'Как изменилась выручка по сравнению с прошлым периодом. Зелёная линия — порог 0% (без изменений).' },
-  { id: 'ch-buyout-cat', title: 'Доля выкупа по типам кофе', desc: 'Процент заказанных товаров, которые не вернули и не отменили. Показывает лояльность покупателей в каждом сегменте.' },
-  { id: 'ch-scheme', title: 'Распределение по схеме работы', desc: 'Какая логистическая модель преобладает: FBO (склад Ozon) или FBS (склад продавца).' },
-  { id: 'ch-super-compare', title: 'Super-товары vs Обычные', desc: 'Сравнение выручки, продаж и конверсии между товарами со статусом Super и обычными.' },
-  { id: 'ch-weight-price', title: 'Вес ↔ Цена по типам кофе', desc: 'Зависимость цены от веса упаковки. Раскраска по типу кофе показывает разницу в цене за грамм между сегментами.' },
-  { id: 'ch-price-box', title: 'Boxplot цен по типам кофе', desc: 'Разброс цен внутри каждого типа кофе: медиана, квартили, выбросы. Помогает понять ценовое позиционирование.' }
+  { id: 'ch-revenue-cat', title: 'Выручка по категориям кофе', desc: 'Какой тип кофе приносит больше денег — растворимый, зерновой или молотый. Помогает понять, на чём стоит сфокусироваться.',
+    help: { shows: 'Столбчатая диаграмма: по горизонтали — типы кофе (растворимый, зерновой, молотый), по вертикали — суммарная выручка в рублях. Длина столбца = общей выручке всех товаров этого типа за 28 дней.',
+            how: 'Наведите курсор на столбец, чтобы увидеть точную сумму и долю в процентах от всей выручки. Кликните по столбцу, чтобы отфильтровать все графики по этой категории.',
+            why: 'Показывает, на каком сегменте кофе зарабатывается больше всего денег. Помогает принять решение о приоритетах при закупке и продвижении.' } },
+  { id: 'ch-top-brands', title: 'Top-20 брендов по выручке', desc: 'Какие бренды кофе зарабатывают больше всего на Ozon. Полезно для оценки конкуренции и поиска популярных поставщиков.',
+    help: { shows: 'Горизонтальная диаграмма со списком 20 брендов с наибольшей выручкой. Самый длинный столбец — лидер по деньгам. Рядом с каждым указана сумма в сокращённом виде (тыс./млн ₽).',
+            how: 'Наведите курсор на строку для точной суммы выручки. Кликните по строке, чтобы оставить в дашборде только этот бренд и сравнить его с остальными графиками.',
+            why: 'Позволяет оценить силу конкурентов и найти ориентиры для собственного бренда. Если ваш бренд не в топе — это зона роста.' } },
+  { id: 'ch-price-dist', title: 'Распределение цен', desc: 'Сколько товаров стоят дёшево, а сколько — дорого. Помогает понять, в каком ценовом диапазоне больше всего предложений.',
+    help: { shows: 'Гистограмма: по оси X — ценовые диапазоны (от дешёвых к дорогим), по оси Y — количество товаров в каждом диапазоне. Красными пунктирами отмечены квартили (25%, медиана, 75%).',
+            how: 'Наведите курсор на столбец, чтобы узнать число товаров и их долю. Обратите внимание на медиану — она показывает «типичную» цену рынка. Редкие выбросы (очень дорогие товары) скрыты для наглядности.',
+            why: 'Помогает понять, в каком ценовом коридоре находится большинство предложений, и найти незанятые ниши (слишком мало или слишком много товаров).' } },
+  { id: 'ch-price-sales', title: 'Цена ↔ Продажи', desc: 'Влияет ли цена на количество продаж. Обычно дорогие товары покупают реже — график проверяет это правило на практике.',
+    help: { shows: 'Точечная диаграмма (scatter): ось X — цена товара (логарифмическая), ось Y — количество проданных штук. Каждая точка — один товар.',
+            how: 'Наведите курсор на точку, чтобы увидеть название товара, его цену и число продаж. Облако точек показывает общую тенденцию: растут ли продажи при снижении цены.',
+            why: 'Проверяет гипотезу «дорого = редко покупают». Помогает оценить эластичность спроса и выбрать оптимальную цену.' } },
+  { id: 'ch-bubble', title: 'Bubble Chart', desc: 'Сравнение товаров по трём показателям сразу: цена, выручка и количество продаж. Размер кружка — сколько продали, цвет — тип кофе.',
+    help: { shows: 'Пузырьковая диаграмма: ось X — цена, ось Y — выручка, размер пузырька — количество проданных штук, цвет — тип кофе. Каждый пузырёк — товар.',
+            how: 'Наведите курсор на пузырёк для деталей. Используйте легенду внизу, чтобы скрыть/показать нужные типы кофе. Большие пузырьки вверху-справа — самые «денежные» товары.',
+            why: 'Позволяет одновременно увидеть цену, оборот и объём продаж и выделить лидеров рынка среди всех товаров.' } },
+  { id: 'ch-pareto', title: 'ABC-анализ (Pareto)', desc: 'Какие товары приносят основную долю выручки. По правилу Парето 20% товаров часто дают 80% денег — здесь это легко проверить.',
+    help: { shows: 'Комбинированный график: столбцы — выручка отдельных товаров (отсортированы по убыванию), красная линия — накопленная доля в процентах от общей выручки.',
+            how: 'Смотрите на красную линию: там, где она пересекает 80%, заканчивается группа товаров, дающих большую часть денег (правило 80/20). Наведите курсор для точных значений.',
+            why: 'Выделяет товары-лидеры (группа А), на которых держится бизнес, и показывает, что остальные товары дают лишь малую долю выручки.' } },
+  { id: 'ch-daily-sales', title: 'Среднесуточные продажи по категориям', desc: 'Сколько в среднем в день зарабатывает каждая категория кофе. Помогает оценить ежедневный спрос на разные типы кофе.',
+    help: { shows: 'Столбчатая диаграмма по типам кофе: высота столбца — средняя выручка в день на один товар категории за 28 дней.',
+            how: 'Наведите курсор на столбец для точной суммы в день. Подписи сверху показывают значение в сокращённом виде.',
+            why: 'Показывает ежедневный темп продаж по сегментам — полезно для планирования поставок и понимания текущего спроса.' } },
+  { id: 'ch-funnel', title: 'Воронка продаж', desc: 'Путь покупателя: от показа товара до покупки. Видно, на каком этапе теряется больше всего людей — и где нужно улучшать.',
+    help: { shows: 'Воронка из 4 этапов: Показы → Посещения → В корзину → Заказано. Ширина каждого блока пропорциональна числу событий.',
+            how: 'Наведите курсор на блок, чтобы увидеть количество и долю от предыдущего шага. Сравните соседние блоки, чтобы найти самый «узкий» переход.',
+            why: 'Показывает, где покупатели отсеиваются: мало показов, не заходят на карточку, не кладут в корзину или не завершают заказ. Точка роста = самый резкий скачок сужения.' } },
+  { id: 'ch-shows-visits', title: 'Показы ↔ Посещения', desc: 'Если товар часто показывают в поиске, заходят ли на его страницу? Помогает оценить, насколько привлекательны фото и название.',
+    help: { shows: 'Точечная диаграмма: ось X — число показов, ось Y — число посещений карточки. Каждая точка — товар.',
+            how: 'Наведите курсор на точку для названия и значений. Точки ниже общей тенденции — товары, которые мало кликают при многих показах (слабое фото/название).',
+            why: 'Оценивает «кликабельность» карточек. Низкий переход показ→визит при высоких показах сигнализирует о проблемах с оформлением товара.' } },
+  { id: 'ch-lost-sales', title: 'Top-20 по упущенным продажам', desc: 'Какие бренды теряют больше всего денег из-за того, что товара нет на складе. Сигнал: завозить товар надо чаще и больше.',
+    help: { shows: 'Горизонтальная диаграмма 20 брендов с наибольшими упущенными продажами (выручка, которую не получили из-за out-of-stock).',
+            how: 'Наведите курсор на строку для точной суммы. Кликните по строке, чтобы отфильтровать дашборд по этому бренду.',
+            why: 'Показывает прямые денежные потери от отсутствия товара на складе. Помогает расставить приоритеты при пополнении остатков.' } },
+  { id: 'ch-correlation', title: 'Корреляционная матрица', desc: 'Связаны ли разные показатели между собой. Например: чем выше цена — тем реже выкупают? Чем больше рекламы — тем больше продаж?',
+    help: { shows: 'Тепловая карта: по осям — показатели (цена, продажи, выручка, выкуп, реклама и др.). Цвет ячейки = коэффициент корреляции от −1 (красный) до +1 (зелёный).',
+            how: 'Наведите курсор на ячейку, чтобы увидеть пару показателей и значение корреляции. Зелёные ячейки — сильная прямая связь, красные — обратная, белые — связи нет.',
+            why: 'Помогает понять причинно-следственные связи: например, растёт ли выручка с рекламой или падает выкуп с ростом цены. Ориентир для гипотез.' } },
+  { id: 'ch-heatmap', title: 'Heatmap «Цена × Категория»', desc: 'Сколько товаров каждой категории продаётся в разных ценовых диапазонах. Помогает выбрать правильную цену для своего товара.',
+    help: { shows: 'Тепловая карта: по оси X — ценовые диапазоны, по оси Y — типы кофе, цвет ячейки — количество товаров в этой ячейке (темнее = больше).',
+            how: 'Наведите курсор на ячейку, чтобы увидеть категорию, диапазон цен и число товаров. Яркие зоны — наиболее «забитые» ценовые ниши.',
+            why: 'Помогает выбрать цену для нового товара: найти перенасыщенные диапазоны (высокая конкуренция) или свободные ниши.' } },
+  { id: 'ch-category-dist', title: 'Доля SKU по типам кофе', desc: 'Сколько товаров каждого типа кофе представлено на площадке. Показывает насыщенность сегментов: растворимый, зерновой, молотый.',
+    help: { shows: 'Кольцевая диаграмма (donut): каждый сектор — тип кофе, его размер пропорционален числу товаров (SKU) этого типа.',
+            how: 'Наведите курсор на сектор, чтобы увидеть количество товаров и их долю в процентах. Кликните по сектору для фильтрации по категории.',
+            why: 'Показывает насыщенность сегментов: где много конкурентов (растворимый кофе), а где ассортимент уже (молотый). Ориентир для выбора ниши.' } },
+  { id: 'ch-brand-orders', title: 'Top-20 брендов по количеству заказов', desc: 'Какие бренды лидируют по числу проданных единиц (не по выручке). Помогает отличить масс-маркет от премиума.',
+    help: { shows: 'Горизонтальная диаграмма 20 брендов с наибольшим числом заказанных штук (не по сумме денег).',
+            how: 'Наведите курсор на строку для точного числа заказов. Кликните по строке, чтобы отфильтровать дашборд по бренду.',
+            why: 'Отличает массовые бренды (много штук, но дешевле) от премиальных. Полезно для понимания структуры спроса.' } },
+  { id: 'ch-ad-share', title: 'Доля рекламных расходов по брендам', desc: 'Кто из брендов активнее вкладывается в рекламу. Высокая доля может означать как агрессивное продвижение, так и неэффективность.',
+    help: { shows: 'Горизонтальная диаграмма 20 брендов: длина столбца — средняя доля рекламных расходов в выручке (%).',
+            how: 'Наведите курсор на строку для точного процента. Кликните по строке, чтобы отфильтровать дашборд по бренду.',
+            why: 'Показывает, насколько агрессивно бренды тратят на рекламу. Высокая доля при низких продажах может указывать на неэффективность кампаний.' } },
+  { id: 'ch-cart-conv', title: 'Конверсия в корзину по брендам', desc: 'Какой процент посетителей карточки добавляет товар в корзину. Косвенный показатель качества контента (фото, описание).',
+    help: { shows: 'Горизонтальная диаграмма 20 брендов: длина столбца — средняя конверсия из посещения карточки в добавление в корзину (%).',
+            how: 'Наведите курсор на строку для точного процента. Кликните по строке, чтобы отфильтровать дашборд по бренду.',
+            why: 'Косвенно оценивает качество карточек (фото, описание, отзывы). Высокая конверсия — признак хорошего контента, низкая — что его надо улучшать.' } },
+  { id: 'ch-dynamics', title: 'Динамика выручки: распределение', desc: 'Как изменилась выручка по сравнению с прошлым периодом. Зелёная линия — порог 0% (без изменений).',
+    help: { shows: 'Гистограмма: по оси X — диапазоны изменения выручки в % (отрицательные — падение, положительные — рост), по оси Y — число товаров в каждом диапазоне. Зелёная пунктирная линия — 0% (без изменений).',
+            how: 'Наведите курсор на столбец для числа товаров и доли. Сравните левую (падение) и правую (рост) части графика.',
+            why: 'Показывает, растёт или падает рынок в целом. Если большинство товаров слева от нуля — общий спад; справа — подъём.' } },
+  { id: 'ch-buyout-cat', title: 'Доля выкупа по типам кофе', desc: 'Процент заказанных товаров, которые не вернули и не отменили. Показывает лояльность покупателей в каждом сегменте.',
+    help: { shows: 'Столбчатая диаграмма по типам кофе: высота столбца — средняя доля выкупа (%).',
+            how: 'Наведите курсор на столбец для точного процента. Подписи сверху показывают значение. Кликните по столбцу для фильтрации по категории.',
+            why: 'Выкуп = заказы, которые не отменили и не вернули. Высокий выкуп говорит о доверии к товару, низкий — о проблемах с качеством или ожиданиями.' } },
+  { id: 'ch-scheme', title: 'Распределение по схеме работы', desc: 'Какая логистическая модель преобладает: FBO (склад Ozon) или FBS (склад продавца).',
+    help: { shows: 'Кольцевая диаграмма: секторы — схемы работы (FBO, FBS и др.), размер пропорционален числу товаров.',
+            how: 'Наведите курсор на сектор для количества товаров и доли в процентах.',
+            why: 'Показывает, какая логистическая модель преобладает на рынке. Помогает оценить, к какой схеме стоит готовиться новичку.' } },
+  { id: 'ch-super-compare', title: 'Super-товары vs Обычные', desc: 'Сравнение выручки, продаж и конверсии между товарами со статусом Super и обычными.',
+    help: { shows: 'Группированная столбчатая диаграмма: по оси X — две группы (Super-товары и Обычные), по оси Y — три метрики (выручка, продажи, конверсия в корзину).',
+            how: 'Наведите курсор на столбец для точных значений по каждой метрике. Используйте легенду внизу для переключения метрик.',
+            why: 'Показывает преимущество статуса Super (приоритет в выдаче Ozon): выше ли у таких товаров выручка и конверсия по сравнению с обычными.' } },
+  { id: 'ch-weight-price', title: 'Вес ↔ Цена по типам кофе', desc: 'Зависимость цены от веса упаковки. Раскраска по типу кофе показывает разницу в цене за грамм между сегментами.',
+    help: { shows: 'Точечная диаграмма: ось X — вес упаковки (г), ось Y — цена (₽), цвет — тип кофе. Каждая точка — товар.',
+            how: 'Наведите курсор на точку для деталей. Легенда внизу скрывает/показывает типы кофе. Наклон облака показывает, дорожает ли кофе с ростом веса.',
+            why: 'Помогает сравнить цену за грамм между сегментами и понять, выгоднее ли покупателям большая или малая упаковка.' } },
+  { id: 'ch-price-box', title: 'Boxplot цен по типам кофе', desc: 'Разброс цен внутри каждого типа кофе: медиана, квартили, выбросы. Помогает понять ценовое позиционирование.',
+    help: { shows: 'Ящик с усами (boxplot) для каждого типа кофе: ромб — медиана (типичная цена), ящик — диапазон от 25% до 75% товаров, усы — минимум и максимум без выбросов.',
+            how: 'Наведите курсор на график для точных значений (мин, Q1, медиана, Q3, макс). Сравните ящики разных категорий по высоте и ширине.',
+            why: 'Показывает ценовое позиционирование сегментов: где цены плотнее (узкий ящик), а где разброс больше. Помогает выбрать нишу по цене.' } },
+  { id: 'ch-dynamics-waterfall', title: 'Водопад динамики выручки', desc: 'Топ товаров по росту и падению выручки относительно прошлого периода. Зелёное — рост, красное — падение.',
+    help: { shows: 'Водопад из 12 товаров: зелёные столбцы — рост выручки, красные — падение, относительно нуля. Высота = величина изменения в %.',
+            how: 'Наведите курсор на столбец для названия товара и точного процента динамики. Слева — самые растущие, справа — падающие.',
+            why: 'Выделяет конкретных лидеров роста и аутсайдеров падения среди товаров, чтобы сфокусировать внимание на них.' } },
+  { id: 'ch-shows-revenue', title: 'Показы ↔ Выручка', desc: 'Связь между числом показов в поиске и суммарной выручкой. Выявляет товары с высоким трафиком, но низкой выручкой.',
+    help: { shows: 'Точечная диаграмма: ось X — число показов, ось Y — выручка (₽). Каждая точка — товар.',
+            how: 'Наведите курсор на точку для названия и значений. Точки вверху-слева — высокая выручка при малых показах (эффективные товары); внизу-справа — много показов, мало денег.',
+            why: 'Помогает найти товары с высоким трафиком, но низкой выручкой (где теряется потенциал) и наоборот — скрытых чемпионов.' } },
+  { id: 'ch-fbo-fbs', title: 'Затраты Ozon: FBO vs FBS', desc: 'Сравнение доли затрат маркетплейса для схем FBO (склад Ozon) и FBS (склад продавца) по каждой схеме работы.',
+    help: { shows: 'Группированная столбчатая диаграмма: по оси X — схемы работы, по оси Y — доля затрат Ozon (%). Синий столбец — FBO, оранжевый — FBS.',
+            how: 'Наведите курсор на пару столбцов для точных процентов FBO и FBS по выбранной схеме.',
+            why: 'Показывает, какая модель логистики обходится дешевле в затратах маркетплейса. Помогает выбрать выгодную схему работы.' } },
+  { id: 'ch-oos-hist', title: 'Дни без остатка: распределение', desc: 'Распределение товаров по числу дней отсутствия на складе (из 28). Показывает масштаб проблемы out-of-stock.',
+    help: { shows: 'Гистограмма: по оси X — диапазоны дней отсутствия товара на складе (из 28), по оси Y — число товаров в каждом диапазоне.',
+            how: 'Наведите курсор на столбец для числа товаров и доли. Чем правее столбец, тем дольше товар отсутствовал и тем больше упущенной выручки.',
+            why: 'Показывает масштаб проблемы нехватки остатков. Много товаров справа = системная проблема с поставками и потерянные продажи.' } },
+  { id: 'ch-weight-donut', title: 'Доля по весовым категориям', desc: 'Какие фасовки преобладают на рынке. Показывает, упаковки какого размера наиболее востребованы.',
+    help: { shows: 'Кольцевая диаграмма: секторы — весовые категории упаковок, размер пропорционален числу товаров.',
+            how: 'Наведите курсор на сектор для количества товаров и доли в процентах.',
+            why: 'Показывает, фасовки какого размера наиболее представлены на рынке. Помогает выбрать востребованный объём упаковки для своего товара.' } },
+  { id: 'ch-buyout-price', title: 'Выкуп ↔ Цена', desc: 'Зависимость доли выкупа от цены товара. Проверяет, чаще ли отказываются от дорогих товаров.',
+    help: { shows: 'Точечная диаграмма: ось X — цена (логарифмическая), ось Y — доля выкупа (%). Каждая точка — товар.',
+            how: 'Наведите курсор на точку для названия, цены и выкупа. Общее направление облака показывает, падает ли выкуп с ростом цены.',
+            why: 'Проверяет, чаще ли покупатели отказываются от дорогих товаров. Помогает оценить риск возвратов при повышении цены.' } },
+  { id: 'ch-delivery-scheme', title: 'Время доставки по схеме', desc: 'Сравнение среднего времени доставки между схемами FBO и FBS. Показывает, какая логистика быстрее.',
+    help: { shows: 'Столбчатая диаграмма: по оси X — схемы работы, по оси Y — среднее время доставки в днях.',
+            how: 'Наведите курсор на столбец для точного среднего времени. Подписи сверху показывают значение в днях.',
+            why: 'Сравнивает скорость доставки между логистическими моделями. Быстрая доставка повышает выкуп и лояльность покупателей.' } }
 ];
+
+function openChartHelp(id) {
+  const def = CHART_DEFS.find(c => c.id === id);
+  if (!def) return;
+  document.getElementById('helpTitle').textContent = def.title;
+  document.getElementById('helpSub').textContent = 'Справка по графику';
+  document.getElementById('helpShows').textContent = def.help?.shows || def.desc || '';
+  document.getElementById('helpHow').textContent = def.help?.how || 'Наведите курсор на элементы графика для деталей. Клик по категории/бренду применяет фильтр ко всем остальным графикам.';
+  document.getElementById('helpWhy').textContent = def.help?.why || '';
+  document.getElementById('helpModal').classList.add('open');
+}
+function closeChartHelp() {
+  document.getElementById('helpModal').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeChartHelp();
+});
 
 function buildUI() {
   const grid = document.getElementById('chartsGrid');
@@ -1267,6 +1673,7 @@ function buildUI() {
       <div class="chart-header">
         <div><div class="chart-title">${c.title}</div><div class="chart-desc">${c.desc}</div></div>
         <div class="chart-actions">
+          <button class="help-btn" onclick="openChartHelp('${c.id}')" title="Справка по графику">?</button>
           <button onclick="exportChartPNG('${c.id}')" title="Экспорт PNG">⬇</button>
           <button onclick="toggleFullscreen('${c.id}')" title="Полноэкранный режим">⛶</button>
         </div>
@@ -1311,6 +1718,7 @@ document.addEventListener('keydown', e => {
 
 // ======================== START ========================
 buildUI();
+setupFileLoader();
 loadData();
 </script>
 </body>
