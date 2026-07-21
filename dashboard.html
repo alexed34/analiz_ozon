@@ -165,7 +165,7 @@ header p{font-size:14px;color:#86868b;font-weight:400}
     <div class="charts-grid" style="grid-template-columns:1fr">
       <div class="chart-card" id="card-ch-sku-radar">
         <div class="chart-header">
-          <div><div class="chart-title">Профиль метрик товара</div><div class="chart-desc">Значения относительно среднего по рынку (100% — среднее)</div></div>
+          <div><div class="chart-title">Профиль метрик товара</div><div class="chart-desc">Сравнение со средним топ-10 конкурентов · 100% — среднее конкурентов, серый пунктир — среднее конкурентов</div></div>
         </div>
         <div class="chart-container" id="ch-sku-radar" style="height:360px"></div>
       </div>
@@ -1789,11 +1789,21 @@ function onSkuInput(val) {
   }
 }
 
+function getCompetitors(row) {
+  const cat = row._category;
+  const myRev = row._revenue || 0;
+  return allData
+    .filter(r => r._category === cat && r !== row && (r._revenue || 0) > myRev)
+    .sort((a, b) => (b._revenue || 0) - (a._revenue || 0))
+    .slice(0, 10);
+}
+
 function renderSkuDetail(row) {
+  const competitors = getCompetitors(row);
   renderSkuHeader(row);
-  renderSkuRadar(row);
+  renderSkuRadar(row, competitors);
   renderSkuTable(row);
-  renderSkuCompetitors(row);
+  renderSkuCompetitors(competitors, row);
 }
 
 function renderSkuHeader(row) {
@@ -1819,8 +1829,7 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function renderSkuRadar(row) {
-  const means = {};
+function renderSkuRadar(row, competitors) {
   const metrics = [
     { key: '_revenuePerVisit', label: 'Выручка/визит', unit: '₽', decimals: 2 },
     { key: '_purchaseConv', label: 'Конверсия в заказ', unit: '%', decimals: 2 },
@@ -1829,16 +1838,29 @@ function renderSkuRadar(row) {
     { key: '_cartConv', label: 'Конверсия в корзину', unit: '%', decimals: 1 },
     { key: '_priceMargin', label: 'Маржа цены', unit: '%', decimals: 1 }
   ];
-  const validItems = allData.filter(r => metrics.every(m => (r[m.key] || 0) > 0));
-  metrics.forEach(m => {
-    means[m.key] = validItems.length ? validItems.reduce((s, r) => s + (r[m.key] || 0), 0) / validItems.length : 1;
-  });
-  const values = metrics.map(m => {
+  // compute competitor averages
+  const compMeans = {};
+  if (competitors.length) {
+    metrics.forEach(m => {
+      const vals = competitors.map(r => r[m.key] || 0).filter(v => v > 0);
+      compMeans[m.key] = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 1;
+    });
+  } else {
+    // fallback: market average
+    const items = allData.filter(r => metrics.every(m => (r[m.key] || 0) > 0));
+    metrics.forEach(m => {
+      compMeans[m.key] = items.length ? items.reduce((s, r) => s + (r[m.key] || 0), 0) / items.length : 1;
+    });
+  }
+  // selected product values (% relative to competitors)
+  const myVals = metrics.map(m => {
     const v = row[m.key] || 0;
-    const mean = means[m.key] || 1;
+    const mean = compMeans[m.key] || 1;
     return +(v / mean * 100).toFixed(0);
   });
-  const indicator = metrics.map((m, i) => ({
+  // competitors average as 100% baseline
+  const compAvgVals = metrics.map(m => 100);
+  const indicator = metrics.map(m => ({
     name: m.label + ' (' + m.unit + ')',
     max: 250
   }));
@@ -1846,15 +1868,15 @@ function renderSkuRadar(row) {
     tooltip: {
       trigger: 'item',
       formatter: function(params) {
-        let s = '<b>' + escHtml(row._name) + '</b><br/>';
-        const seriesData = Array.isArray(params) ? params : [params];
-        seriesData.forEach(p => {
+        const items = Array.isArray(params) ? params : [params];
+        let s = '';
+        items.forEach(p => {
+          s += '<b>' + escHtml(p.seriesName) + '</b><br/>';
           const vals = p.value || [];
           vals.forEach((v, i) => {
             const m = metrics[i];
             if (!m) return;
-            const raw = row[m.key] || 0;
-            s += m.label + ': <b>' + raw.toFixed(m.decimals) + ' ' + m.unit + '</b> (' + v + '% от среднего)<br/>';
+            s += m.label + ': <b>' + v + '%</b><br/>';
           });
         });
         return s;
@@ -1865,15 +1887,27 @@ function renderSkuRadar(row) {
       center: ['50%', '50%'],
       radius: '65%',
       splitArea: { areaStyle: { color: ['rgba(0,113,227,.02)', 'rgba(0,113,227,.05)'] } },
-      axisLine: { lineStyle: { color: 'rgba(0,0,0,.08)' } }
+      axisLine: { lineStyle: { color: 'rgba(0,0,0,.08)' } },
+      axisLabel: { formatter: '{value}%' }
     },
-    series: [{
-      type: 'radar',
-      data: [{ value: values, name: row._name, areaStyle: { color: 'rgba(0,113,227,.25)' }, lineStyle: { color: '#0071e3', width: 2 }, itemStyle: { color: '#0071e3' } }],
-      symbol: 'circle',
-      symbolSize: 6,
-      emphasis: { lineStyle: { width: 3 } }
-    }]
+    series: [
+      {
+        type: 'radar',
+        name: row._name,
+        data: [{ value: myVals, name: row._name, areaStyle: { color: 'rgba(0,113,227,.25)' }, lineStyle: { color: '#0071e3', width: 2 }, itemStyle: { color: '#0071e3' } }],
+        symbol: 'circle',
+        symbolSize: 6,
+        emphasis: { lineStyle: { width: 3 } }
+      },
+      {
+        type: 'radar',
+        name: 'Среднее конкурентов',
+        data: [{ value: compAvgVals, name: 'Среднее конкурентов', areaStyle: { color: 'rgba(134,134,139,.1)' }, lineStyle: { color: '#86868b', width: 1.5, type: 'dashed' }, itemStyle: { color: '#86868b' } }],
+        symbol: 'none',
+        lineStyle: { type: 'dashed' },
+        emphasis: { lineStyle: { width: 2 } }
+      }
+    ]
   };
   const dom = document.getElementById('ch-sku-radar');
   if (!dom) return;
@@ -1972,13 +2006,7 @@ function renderSkuTable(row) {
 
 let _compChart = null;
 
-function renderSkuCompetitors(row) {
-  const cat = row._category;
-  const myRev = row._revenue || 0;
-  const competitors = allData
-    .filter(r => r._category === cat && r !== row && (r._revenue || 0) > myRev)
-    .sort((a, b) => (b._revenue || 0) - (a._revenue || 0))
-    .slice(0, 10);
+function renderSkuCompetitors(competitors, row) {
   const wrap = document.getElementById('skuCompetitorsWrap');
   if (!competitors.length) {
     wrap.style.display = 'none';
