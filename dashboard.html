@@ -94,6 +94,9 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 .sku-table tr:hover{background:rgba(0,0,0,.02)}
 .sku-table .section-row td{font-weight:700;color:#1d1d1f;padding-top:16px;padding-bottom:8px;background:transparent;font-size:14px;border-bottom:2px solid rgba(0,0,0,.08)}
 .sku-table .section-row:hover{background:transparent}
+.sku-competitors-wrap{background:rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:4px 20px 20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7)}
+.sku-comp-highlight{background:rgba(0,113,227,.06)!important}
+.sku-comp-highlight td{font-weight:600}
 </style>
 </head>
 <body>
@@ -170,6 +173,18 @@ header p{font-size:14px;color:#86868b;font-weight:400}
     <div class="sku-table-wrap">
       <div class="section-header"><h2>Все поля товара</h2></div>
       <table class="sku-table" id="skuTable"></table>
+    </div>
+    <div class="sku-competitors-wrap" id="skuCompetitorsWrap" style="display:none">
+      <div class="section-header"><h2>Конкуренты в категории</h2><p>Топ-10 товаров той же категории с большей выручкой</p></div>
+      <div class="charts-grid" style="grid-template-columns:1fr">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div><div class="chart-title">Сравнение по выручке</div><div class="chart-desc">Топ-10 конкурентов с большей выручкой, чем у выбранного товара</div></div>
+          </div>
+          <div class="chart-container" id="ch-sku-competitors" style="height:360px"></div>
+        </div>
+      </div>
+      <table class="sku-table" id="skuCompetitorsTable"></table>
     </div>
   </div>
   <div id="skuEmpty" class="chart-card" style="grid-column:1/-1;padding:40px;text-align:center">
@@ -1778,6 +1793,7 @@ function renderSkuDetail(row) {
   renderSkuHeader(row);
   renderSkuRadar(row);
   renderSkuTable(row);
+  renderSkuCompetitors(row);
 }
 
 function renderSkuHeader(row) {
@@ -1952,6 +1968,65 @@ function renderSkuTable(row) {
     });
   });
   document.getElementById('skuTable').innerHTML = html;
+}
+
+let _compChart = null;
+
+function renderSkuCompetitors(row) {
+  const cat = row._category;
+  const myRev = row._revenue || 0;
+  const competitors = allData
+    .filter(r => r._category === cat && r !== row && (r._revenue || 0) > myRev)
+    .sort((a, b) => (b._revenue || 0) - (a._revenue || 0))
+    .slice(0, 10);
+  const wrap = document.getElementById('skuCompetitorsWrap');
+  if (!competitors.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'block';
+  renderCompChart(competitors, row);
+  renderCompTable(competitors, row);
+}
+
+function renderCompChart(competitors, row) {
+  const items = competitors.slice(0).reverse();
+  const names = items.map(r => r._name.length > 22 ? r._name.slice(0, 22) + '\u2026' : r._name);
+  const vals = items.map(r => r._revenue || 0);
+  const full = items.map(r => r._name);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const i = p[0].dataIndex; return '<b>' + escHtml(full[i]) + '</b><br/>Выручка: <b>' + fmt(vals[i]) + ' \u20BD</b>'; } },
+    grid: { left: 10, right: 50, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: function(v) { return v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0); } }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: names, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 10 } },
+    series: [{
+      type: 'bar', data: vals, barMaxWidth: 20,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#34c759' }, { offset: 1, color: '#30d158' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#28a745' } },
+      label: { show: true, position: 'right', formatter: function(p) { return fmtM(p.value); }, fontSize: 10, color: '#86868b' },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#0071e3', type: 'dashed', width: 2 },
+        data: [{ xAxis: row._revenue || 0, label: { formatter: 'Выбранный товар: ' + fmtM(row._revenue || 0), position: 'insideEndTop', fontSize: 10, color: '#0071e3' } }]
+      }
+    }]
+  };
+  const dom = document.getElementById('ch-sku-competitors');
+  if (!dom) return;
+  if (!_compChart) {
+    _compChart = echarts.init(dom, null, { renderer: 'canvas' });
+    window.addEventListener('resize', () => _compChart.resize());
+  }
+  _compChart.setOption(option, { notMerge: true });
+}
+
+function renderCompTable(competitors, row) {
+  let html = '<tr class="section-row"><td style="width:260px">Название</td><td style="width:100px">Артикул Ozon</td><td style="width:100px">Бренд</td><td style="width:100px">Цена</td><td style="width:100px">Выручка</td><td>Продано</td></tr>';
+  html += '<tr class="sku-comp-highlight"><td>' + escHtml(row._name) + ' <span style="color:#0071e3;font-weight:400">(выбранный)</span></td><td>' + escHtml(row['Артикул Ozon'] || '') + '</td><td>' + escHtml(row._brand || '') + '</td><td>' + (row._price || 0).toLocaleString() + ' \u20BD</td><td>' + fmt(row._revenue || 0) + ' \u20BD</td><td>' + (row._orders || 0).toLocaleString() + '</td></tr>';
+  competitors.forEach(r => {
+    html += '<tr><td>' + escHtml(r._name) + '</td><td>' + escHtml(r['Артикул Ozon'] || '') + '</td><td>' + escHtml(r._brand || '') + '</td><td>' + (r._price || 0).toLocaleString() + ' \u20BD</td><td>' + fmt(r._revenue || 0) + ' \u20BD</td><td>' + (r._orders || 0).toLocaleString() + '</td></tr>';
+  });
+  document.getElementById('skuCompetitorsTable').innerHTML = html;
 }
 
 // ======================== INIT ========================
