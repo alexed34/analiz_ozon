@@ -198,6 +198,42 @@ header p{font-size:14px;color:#86868b;font-weight:400}
         </div>
         <div class="chart-container" id="ch-sku-efficiency" style="height:300px"></div>
       </div>
+      <div class="chart-card" id="card-ch-sku-metric-rev">
+        <div class="chart-header">
+          <div><div class="chart-title">Выручка на визит</div><div class="chart-desc">Средняя выручка с одного посещения карточки</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-metric-rev')" title="Справка по графику">?</button>
+          </div>
+        </div>
+        <div class="chart-container" id="ch-sku-metric-rev" style="height:300px"></div>
+      </div>
+      <div class="chart-card" id="card-ch-sku-metric-conv">
+        <div class="chart-header">
+          <div><div class="chart-title">Конверсия в заказ</div><div class="chart-desc">% посещений, завершившихся покупкой</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-metric-conv')" title="Справка по графику">?</button>
+          </div>
+        </div>
+        <div class="chart-container" id="ch-sku-metric-conv" style="height:300px"></div>
+      </div>
+      <div class="chart-card" id="card-ch-sku-metric-buyout">
+        <div class="chart-header">
+          <div><div class="chart-title">Доля выкупа</div><div class="chart-desc">% заказов, которые не отменили и не вернули</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-metric-buyout')" title="Справка по графику">?</button>
+          </div>
+        </div>
+        <div class="chart-container" id="ch-sku-metric-buyout" style="height:300px"></div>
+      </div>
+      <div class="chart-card" id="card-ch-sku-metric-ctr">
+        <div class="chart-header">
+          <div><div class="chart-title">CTR из поиска</div><div class="chart-desc">% показов, которые привели к посещению карточки</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-metric-ctr')" title="Справка по графику">?</button>
+          </div>
+        </div>
+        <div class="chart-container" id="ch-sku-metric-ctr" style="height:300px"></div>
+      </div>
     </div>
     <div class="sku-competitors-wrap" id="skuCompetitorsWrap" style="display:none">
       <div class="section-header"><h2>Конкуренты в категории</h2><p>Топ-10 товаров той же категории с большей выручкой</p></div>
@@ -1792,6 +1828,7 @@ function switchTab(tab) {
     if (_skuStarsChart) _skuStarsChart.resize();
     if (_skuTrafficChart) _skuTrafficChart.resize();
     if (_skuEffChart) _skuEffChart.resize();
+    Object.values(_skuMetricCharts).forEach(c => c.resize());
     if (_compChart) _compChart.resize();
     Object.values(charts).forEach(c => c.resize());
   }, 200);
@@ -1844,11 +1881,17 @@ function renderSkuDetail(row) {
   renderSkuCompetitors(competitors, row);
 }
 
+let _skuMetricCharts = {};
+
 function renderSkuCompCharts(competitors, row) {
   const all = competitors.concat([row]);
   renderSkuStars(all, row);
   renderSkuTrafficMatrix(all, row);
   renderSkuEfficiency(all, row);
+  renderSkuMetricBar(all, row, 'ch-sku-metric-rev', '_revenuePerVisit', 'Выручка на визит, ₽', { decimals: 2, suffix: ' ₽' });
+  renderSkuMetricBar(all, row, 'ch-sku-metric-conv', '_purchaseConv', 'Конверсия в заказ, %', { decimals: 2, suffix: '%' });
+  renderSkuMetricBar(all, row, 'ch-sku-metric-buyout', '_buyout', 'Доля выкупа, %', { decimals: 1, suffix: '%' });
+  renderSkuMetricBar(all, row, 'ch-sku-metric-ctr', '_ctr', 'CTR, %', { decimals: 2, suffix: '%' });
 }
 
 function renderSkuHeader(row) {
@@ -2163,6 +2206,37 @@ function renderSkuEfficiency(all, row) {
   _skuEffChart.setOption(option, { notMerge: true });
 }
 
+function renderSkuMetricBar(all, row, chartId, field, label, fmt) {
+  const pts = all.filter(r => (r[field] || 0) > 0);
+  if (pts.length < 3) { document.getElementById('card-' + chartId).style.display = 'none'; return; }
+  document.getElementById('card-' + chartId).style.display = '';
+  const mean = pts.reduce((s, r) => s + (r[field] || 0), 0) / pts.length;
+  const items = pts.slice().sort((a, b) => (b[field] || 0) - (a[field] || 0)).reverse();
+  const names = items.map(r => r._name.length > 22 ? r._name.slice(0, 22) + '\u2026' : r._name);
+  const vals = items.map(r => r[field] || 0);
+  const full = items.map(r => r._name);
+  const isSelected = items.map(r => r === row);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const i = p[0].dataIndex; return '<b>' + escHtml(full[i]) + '</b><br/>' + label + ': <b>' + vals[i].toFixed(fmt.decimals) + fmt.suffix + '</b>'; } },
+    grid: { left: 10, right: 50, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: function(v) { return v >= 1e3 ? v.toFixed(0) : v.toFixed(fmt.decimals); }, fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: names, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9 } },
+    series: [{
+      type: 'bar', data: vals.map((v, i) => ({ value: v, itemStyle: isSelected[i] ? { color: '#0071e3', borderRadius: [0,4,4,0] } : { color: 'rgba(134,134,139,0.35)', borderRadius: [0,4,4,0] } })), barMaxWidth: 18,
+      label: { show: true, position: 'right', formatter: function(p) { return p.value.toFixed(fmt.decimals) + fmt.suffix; }, fontSize: 9, color: '#86868b' },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#86868b', type: 'dashed', width: 1.5 },
+        data: [{ xAxis: mean, label: { formatter: 'среднее ' + mean.toFixed(fmt.decimals) + fmt.suffix, position: 'insideEndTop', fontSize: 9, color: '#86868b' } }]
+      }
+    }]
+  };
+  const dom = document.getElementById(chartId);
+  if (!dom) return;
+  if (!_skuMetricCharts[chartId]) { _skuMetricCharts[chartId] = echarts.init(dom, null, { renderer: 'canvas' }); window.addEventListener('resize', () => _skuMetricCharts[chartId].resize()); }
+  _skuMetricCharts[chartId].setOption(option, { notMerge: true });
+}
+
 function renderSkuCompetitors(competitors, row) {
   const wrap = document.getElementById('skuCompetitorsWrap');
   if (!competitors.length) {
@@ -2407,7 +2481,23 @@ const SKU_CHART_HELP = [
   { id: 'ch-sku-efficiency', title: 'Индекс эффективности карточки', desc: 'Сводный индекс по 4 метрикам',
     help: { shows: 'Горизонтальный рейтинг на основе 4 метрик: выручка/визит, конверсия в заказ, доля выкупа, CTR. Значение нормировано относительно среднего по группе (выбранный товар + 10 конкурентов). Зелёный пунктир — порог 80. Синий столбец — выбранный товар.',
             how: 'Индекс > 80 — эффективная карточка. Наведите на строку для точного значения. Чем выше индекс, тем лучше карточка проработана по всем метрикам.',
-            why: 'Комплексная оценка качества карточки товара среди прямых конкурентов. Учитывает и трафик, и конверсию, и монетизацию, и выкуп.' } }
+            why: 'Комплексная оценка качества карточки товара среди прямых конкурентов. Учитывает и трафик, и конверсию, и монетизацию, и выкуп.' } },
+  { id: 'ch-sku-metric-rev', title: 'Выручка на визит', desc: 'Одна из 4 метрик индекса эффективности',
+    help: { shows: 'Горизонтальный рейтинг товаров по средней выручке с одного посещения карточки. Синий столбец — выбранный товар, серые — конкуренты. Серый пунктир — среднее по группе.',
+            how: 'Чем выше значение, тем эффективнее карточка монетизирует трафик. Наведите для точного значения.',
+            why: 'Показывает, сколько денег приносит каждый визит на карточку. Высокое значение = хорошее оформление + правильная цена.' } },
+  { id: 'ch-sku-metric-conv', title: 'Конверсия в заказ', desc: 'Одна из 4 метрик индекса эффективности',
+    help: { shows: 'Горизонтальный рейтинг товаров по доле посещений, завершившихся покупкой. Синий столбец — выбранный товар, серые — конкуренты. Серый пунктир — среднее по группе.',
+            how: 'Высокая конверсия = хороший контент карточки (фото, описание, отзывы) и конкурентная цена. Наведите для точного значения.',
+            why: 'Ключевой показатель качества карточки. Низкая конверсия при высоком трафике — сигнал улучшать контент.' } },
+  { id: 'ch-sku-metric-buyout', title: 'Доля выкупа', desc: 'Одна из 4 метрик индекса эффективности',
+    help: { shows: 'Горизонтальный рейтинг товаров по доле заказов, которые не были отменены или возвращены. Синий столбец — выбранный товар, серые — конкуренты. Серый пунктир — среднее по группе.',
+            how: 'Высокий выкуп = покупатели довольны товаром. Низкий выкуп = проблемы с качеством, ожиданиями или описанием. Наведите для точного значения.',
+            why: 'Отражает реальную удовлетворённость покупателей. Низкий выкуп ведёт к штрафам Ozon и потере рейтинга.' } },
+  { id: 'ch-sku-metric-ctr', title: 'CTR из поиска', desc: 'Одна из 4 метрик индекса эффективности',
+    help: { shows: 'Горизонтальный рейтинг товаров по CTR (отношение посещений к показам в поиске и каталоге). Синий столбец — выбранный товар, серые — конкуренты. Серый пунктир — среднее по группе.',
+            how: 'Высокий CTR = привлекательные фото, название и цена. Низкий CTR = нужно улучшать визуальное оформление карточки. Наведите для точного значения.',
+            why: 'Показывает, насколько товар кликабелен в выдаче. Первый шаг воронки продаж — если CTR низкий, остальные метрики не имеют значения.' } }
 ];
 
 function openChartHelp(id) {
