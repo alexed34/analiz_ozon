@@ -160,6 +160,25 @@ header p{font-size:14px;color:#86868b;font-weight:400}
     <input type="text" id="skuSearch" placeholder="Введите артикул Ozon…" oninput="onSkuInput(this.value)" onchange="onSkuInput(this.value)" autocomplete="off">
     <span class="kpi-filter-count" id="skuCount"></span>
   </div>
+  <div class="filters-bar" id="skuFiltersBar" style="display:none;margin-bottom:16px;padding:12px 16px">
+    <div class="filters-top" style="margin-bottom:0">
+      <span style="font-size:12px;color:#86868b;font-weight:600;margin-right:4px">Конкуренты:</span>
+      <select id="skuCountSelect" style="min-width:70px" onchange="onSkuFilterChange()">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+      </select>
+      <select id="skuMetricSelect" style="min-width:120px" onchange="onSkuFilterChange()">
+        <option value="revenue" selected>По выручке</option>
+        <option value="orders">По продажам, шт</option>
+      </select>
+      <select id="skuModeSelect" style="min-width:150px" onchange="onSkuFilterChange()">
+        <option value="nearest" selected>Ближайшие сверху</option>
+        <option value="top">Топ-конкуренты</option>
+      </select>
+    </div>
+  </div>
   <div id="skuDetail" style="display:none">
     <div class="sku-header" id="skuHeader"></div>
     <div class="charts-grid" style="grid-template-columns:1fr">
@@ -1810,6 +1829,10 @@ function renderBuyoutPrice(d) {
 
 // ======================== SKU TAB ========================
 let _skuChart = null;
+let _currentSkuRow = null;
+let skuFilterCount = 10;
+let skuFilterMetric = 'revenue';
+let skuFilterMode = 'nearest';
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('tab-active', t.dataset.tab === tab));
@@ -1819,6 +1842,7 @@ function switchTab(tab) {
     if (!val) {
       document.getElementById('skuEmpty').style.display = 'block';
       document.getElementById('skuDetail').style.display = 'none';
+      document.getElementById('skuFiltersBar').style.display = 'none';
     } else {
       onSkuInput(val);
     }
@@ -1837,6 +1861,7 @@ function switchTab(tab) {
 function initSkuSearch() {
   const el = document.getElementById('skuSearch');
   if (!el) return;
+  restoreSkuFilterState();
 }
 
 function onSkuInput(val) {
@@ -1844,16 +1869,20 @@ function onSkuInput(val) {
   if (!val) {
     document.getElementById('skuEmpty').style.display = 'block';
     document.getElementById('skuDetail').style.display = 'none';
+    document.getElementById('skuFiltersBar').style.display = 'none';
     return;
   }
   const row = allData.find(r => String(r['Артикул Ozon'] || '').trim() === val);
   if (row) {
     document.getElementById('skuEmpty').style.display = 'none';
     document.getElementById('skuDetail').style.display = 'block';
+    document.getElementById('skuFiltersBar').style.display = '';
+    _currentSkuRow = row;
     renderSkuDetail(row);
   } else {
     document.getElementById('skuEmpty').style.display = 'block';
     document.getElementById('skuDetail').style.display = 'none';
+    document.getElementById('skuFiltersBar').style.display = 'none';
     document.querySelector('#skuEmpty .chart-title').textContent = 'Товар не найден';
     document.querySelector('#skuEmpty .chart-desc').textContent = 'Товар с артикулом ' + val + ' не найден. Попробуйте другой артикул.';
   }
@@ -1861,16 +1890,67 @@ function onSkuInput(val) {
 
 function getCompetitors(row) {
   const cat = row._category;
-  const myRev = row._revenue || 0;
-  return allData
-    .filter(r => r._category === cat && r !== row && (r._revenue || 0) > myRev)
-    .sort((a, b) => (a._revenue || 0) - (b._revenue || 0))
-    .slice(0, 10);
+  const field = skuFilterMetric === 'revenue' ? '_revenue' : '_orders';
+  const myVal = row[field] || 0;
+  const candidates = allData.filter(r => r._category === cat && r !== row && (r[field] || 0) > myVal);
+  if (skuFilterMode === 'nearest') {
+    candidates.sort((a, b) => (a[field] || 0) - (b[field] || 0));
+  } else {
+    candidates.sort((a, b) => (b[field] || 0) - (a[field] || 0));
+  }
+  return candidates.slice(0, skuFilterCount);
 }
 
 let _skuStarsChart = null;
 let _skuTrafficChart = null;
 let _skuEffChart = null;
+
+function saveSkuFilterState() {
+  try { localStorage.setItem('coffeeDashboardSkuFilters', JSON.stringify({ count: skuFilterCount, metric: skuFilterMetric, mode: skuFilterMode })); } catch(e) {}
+}
+
+function restoreSkuFilterState() {
+  try {
+    const saved = localStorage.getItem('coffeeDashboardSkuFilters');
+    if (saved) {
+      const f = JSON.parse(saved);
+      skuFilterCount = f.count || 10;
+      skuFilterMetric = f.metric || 'revenue';
+      skuFilterMode = f.mode || 'nearest';
+      const el1 = document.getElementById('skuCountSelect');
+      const el2 = document.getElementById('skuMetricSelect');
+      const el3 = document.getElementById('skuModeSelect');
+      if (el1) el1.value = String(skuFilterCount);
+      if (el2) el2.value = skuFilterMetric;
+      if (el3) el3.value = skuFilterMode;
+    }
+  } catch(e) {}
+}
+
+function onSkuFilterChange() {
+  skuFilterCount = parseInt(document.getElementById('skuCountSelect').value) || 10;
+  skuFilterMetric = document.getElementById('skuMetricSelect').value;
+  skuFilterMode = document.getElementById('skuModeSelect').value;
+  saveSkuFilterState();
+  if (_currentSkuRow) reRenderSku();
+}
+
+function reRenderSku() {
+  // dispose old charts to avoid memory leaks
+  Object.values(_skuMetricCharts).forEach(c => { try { c.dispose(); } catch(e) {} });
+  if (_skuChart) try { _skuChart.dispose(); } catch(e) {}
+  if (_skuStarsChart) try { _skuStarsChart.dispose(); } catch(e) {}
+  if (_skuTrafficChart) try { _skuTrafficChart.dispose(); } catch(e) {}
+  if (_skuEffChart) try { _skuEffChart.dispose(); } catch(e) {}
+  if (_compChart) try { _compChart.dispose(); } catch(e) {}
+  _skuChart = null;
+  _skuStarsChart = null;
+  _skuTrafficChart = null;
+  _skuEffChart = null;
+  _skuMetricCharts = {};
+  _compChart = null;
+  renderSkuDetail(_currentSkuRow);
+}
 
 function renderSkuDetail(row) {
   const competitors = getCompetitors(row);
