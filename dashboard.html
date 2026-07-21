@@ -61,6 +61,9 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 .help-modal-close-x{position:absolute;top:18px;right:20px;width:32px;height:32px;border:none;background:rgba(0,0,0,.05);border-radius:50%;font-size:18px;color:#86868b;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .help-modal-close-x:hover{background:rgba(0,0,0,.1);color:#1d1d1f}
 .help-modal-box-wrap{position:relative}
+.section-header{grid-column:1/-1;padding:16px 4px 4px;border-bottom:1px solid rgba(0,0,0,.06);margin-bottom:4px}
+.section-header h2{font-size:20px;font-weight:700;letter-spacing:-.3px;color:#1d1d1f}
+.section-header p{font-size:12px;color:#86868b;margin-top:2px}
 .chart-container{width:100%;height:360px}
 .chart-container-full{width:100%;height:calc(100vh - 300px);min-height:500px}
 .fullscreen-active{position:fixed!important;top:0;left:0;width:100vw;height:100vh;z-index:9999;padding:24px;background:#f5f5f7;border-radius:0!important;overflow:auto}
@@ -81,6 +84,7 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 </header>
 
 <div class="kpi-grid" id="kpiGrid"></div>
+<div class="kpi-grid" id="kpiGridAdvanced"></div>
 
 <div class="filters-bar" id="filtersBar">
   <div class="filters-top">
@@ -156,7 +160,21 @@ const NUMERIC_FIELDS = {
   'В корзину из поиска и каталога, %': 'cartFromSearch',
   'В корзину из карточки, %': 'cartFromCard',
   'Дней без остатка, дни': 'oosDays',
-  'Самая низкая цена, ?': 'lowestPrice'
+  'Самая низкая цена, ?': 'lowestPrice',
+  'Вес_из_названия_г': 'weightG',
+  'CTR_из_поиска_%': 'ctr',
+  'Конверсия_в_покупку_%': 'purchaseConv',
+  'Конверсия_из_показа_%': 'impressionConv',
+  'Цена_за_1_г_?': 'pricePerGram',
+  'Маржа_цены_%': 'priceMargin',
+  'Средний_чек_?': 'avgCheck',
+  'Выручка_на_показ_?': 'revenuePerImpression',
+  'Выручка_на_визит_?': 'revenuePerVisit',
+  'ADS_на_единицу_объема_?_л': 'adsPerVolume',
+  'Эффективность_схемы': 'schemeEfficiency',
+  'Дней_с_остатком': 'daysWithStock',
+  'Коэфф_дефицита_%': 'deficitRatio',
+  'Потенциальный_спрос_?': 'potentialDemand'
 };
 
 function parseNum(v) {
@@ -225,6 +243,20 @@ function parseJSONData(json) {
     row._fbsCost = row['Доля затрат на Ozon, FBS, %_num'] || 0;
     row._dailySalesQty = row['Среднесуточные продажи, шт_num'] || 0;
     row._lowestPrice = row['Самая низкая цена, ?_num'] || 0;
+    row._weightG = row['Вес_из_названия_г_num'] || 0;
+    row._ctr = row['CTR_из_поиска_%_num'] || 0;
+    row._purchaseConv = row['Конверсия_в_покупку_%_num'] || 0;
+    row._impressionConv = row['Конверсия_из_показа_%_num'] || 0;
+    row._pricePerGram = row['Цена_за_1_г_?_num'] || 0;
+    row._priceMargin = row['Маржа_цены_%_num'] || 0;
+    row._avgCheck = row['Средний_чек_?_num'] || 0;
+    row._revenuePerImp = row['Выручка_на_показ_?_num'] || 0;
+    row._revenuePerVisit = row['Выручка_на_визит_?_num'] || 0;
+    row._adsPerVolume = row['ADS_на_единицу_объема_?_л_num'] || 0;
+    row._schemeEff = row['Эффективность_схемы_num'] || 0;
+    row._daysWithStock = row['Дней_с_остатком_num'] || 0;
+    row._deficitRatio = row['Коэфф_дефицита_%_num'] || 0;
+    row._potentialDemand = row['Потенциальный_спрос_?_num'] || 0;
     rows.push(row);
   }
   return rows;
@@ -430,6 +462,36 @@ function renderKPI() {
   ];
   const grid = document.getElementById('kpiGrid');
   grid.innerHTML = kpis.map(k => `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.val}</div>${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>`).join('');
+
+  // Second KPI row
+  const potentialRev = d.reduce((s, r) => s + r._potentialDemand, 0);
+  const avgConv = d.filter(r => r._purchaseConv > 0).reduce((s, r, _, a) => s + r._purchaseConv / a.length, 0);
+  const avgRevPerVisit = d.filter(r => r._revenuePerVisit > 0).reduce((s, r, _, a) => s + r._revenuePerVisit / a.length, 0);
+  const avgPriceGram = d.filter(r => r._pricePerGram > 0).reduce((s, r, _, a) => s + r._pricePerGram / a.length, 0);
+  const noDeficit = d.filter(r => r._deficitRatio < 5).length;
+  const noDeficitPct = skuCount ? (noDeficit / skuCount * 100).toFixed(1) : 0;
+  const potentialThreshold = d.map(r => r._potentialDemand).sort((a, b) => a - b)[Math.floor(skuCount * 0.75)] || 0;
+  const highPotential = d.filter(r => r._potentialDemand >= potentialThreshold).length;
+  const highOOSRisk = d.filter(r => r._deficitRatio > 30).length;
+  const effectiveCards = d.filter(r => {
+    if (!r._revenuePerVisit || !r._purchaseConv || !r._buyout || !r._ctr) return false;
+    const z = (r._revenuePerVisit / (avgRevPerVisit || 1) + r._purchaseConv / (avgConv || 1) + r._buyout / (avgBuyout || 1) + r._ctr / (d.filter(x => x._ctr > 0).reduce((s, x, _, a) => s + x._ctr / a.length, 0.01) || 1)) / 4 * 100;
+    return z > 80;
+  }).length;
+  const avgAdShareAll = d.filter(r => r._adShare > 0).reduce((s, r, _, a) => s + r._adShare / a.length, 0);
+  const advanced = [
+    { label: 'Потенциальная выручка', val: formatCurrency(potentialRev) },
+    { label: 'Средняя конверсия в заказ', val: avgConv.toFixed(2) + '%' },
+    { label: 'Средняя выручка на визит', val: avgRevPerVisit.toFixed(2) + ' ₽' },
+    { label: 'Средняя цена за грамм', val: avgPriceGram.toFixed(2) + ' ₽' },
+    { label: 'Доля без дефицита', val: noDeficitPct + '%', sub: noDeficit.toLocaleString() + ' SKU' },
+    { label: 'Средние рекламные расходы', val: avgAdShareAll.toFixed(1) + '%' },
+    { label: 'Высокий потенциал роста', val: highPotential.toLocaleString(), sub: '> p75 спроса' },
+    { label: 'Риск OOS (>30%)', val: highOOSRisk.toLocaleString() + ' SKU' },
+    { label: 'Эффективных карточек', val: effectiveCards.toLocaleString(), sub: 'индекс > 80' }
+  ];
+  const grid2 = document.getElementById('kpiGridAdvanced');
+  grid2.innerHTML = advanced.map(k => `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.val}</div>${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}</div>`).join('');
 }
 
 function formatCurrency(v) {
@@ -514,11 +576,422 @@ function handleChartClick(sourceId, params) {
   }
 }
 
+// ======================== NEW CHART RENDER FUNCTIONS ========================
+
+// ---- 1. Potential Demand x Deficit Ratio ----
+function renderDemandDeficit(d) {
+  const pts = d.filter(r => r._potentialDemand > 0 && r._deficitRatio > 0);
+  const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
+  const catColors = {};
+  cats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
+  const medDemand = pts.map(r => r._potentialDemand).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const medDeficit = pts.map(r => r._deficitRatio).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const series = cats.map(cat => ({
+    name: cat, type: 'scatter',
+    data: pts.filter(r => r._category === cat).map(r => ({ value: [r._potentialDemand, r._deficitRatio], name: r._name })),
+    symbolSize: 5, itemStyle: { color: catColors[cat], opacity: 0.6 },
+    emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
+  })).filter(s => s.data.length > 0);
+  const option = {
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Спрос: <b>${fmt(p.data.value[0])} ₽</b><br/>Дефицит: <b>${p.data.value[1].toFixed(1)}%</b>` },
+    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'log', name: 'Потенциальный спрос, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Коэфф. дефицита, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: series.concat([
+      { type: 'line', data: [[0, medDeficit], [Math.max(...pts.map(r => r._potentialDemand)), medDeficit]], symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 }, silent: true },
+      { type: 'line', data: [[medDemand, 0], [medDemand, 100]], symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 }, silent: true }
+    ])
+  };
+  createChart('ch-demand-deficit', option);
+}
+
+// ---- 2. Price per Gram vs Daily Sales ----
+function renderPricePerGramSales(d) {
+  const pts = d.filter(r => r._pricePerGram > 0 && r._dailySales > 0);
+  const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
+  const catColors = {};
+  cats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
+  const series = cats.map(cat => ({
+    name: cat, type: 'scatter',
+    data: pts.filter(r => r._category === cat).map(r => ({ value: [r._pricePerGram, r._dailySales], name: r._name })),
+    symbolSize: 5, itemStyle: { color: catColors[cat], opacity: 0.6 },
+    emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
+  })).filter(s => s.data.length > 0);
+  const option = {
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Цена/г: <b>${p.data.value[0].toFixed(2)} ₽</b><br/>Продажи/день: <b>${fmt(p.data.value[1])} ₽</b>` },
+    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'log', name: 'Цена за грамм, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Среднесуточные продажи, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: series
+  };
+  createChart('ch-price-gram-sales', option);
+}
+
+// ---- 3. Sales x Conversion Stars (4 quadrants) ----
+function renderSalesConversionStars(d) {
+  const pts = d.filter(r => r._orders > 0 && r._purchaseConv > 0);
+  if (!pts.length) return;
+  const medSales = pts.map(r => r._orders).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const medConv = pts.map(r => r._purchaseConv).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const colors = pts.map(r => {
+    const highS = r._orders >= medSales, highC = r._purchaseConv >= medConv;
+    return highS && highC ? '#34c759' : highS && !highC ? '#ff9500' : !highS && highC ? '#0071e3' : '#ff3b30';
+  });
+  const names = pts.map(r => r._name);
+  const sizes = pts.map(r => Math.max(6, Math.log10(r._revenue + 1) * 3));
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data; const i = d[2]; return `<b>${names[i]}</b><br/>Продажи: <b>${fmt(d[0])} шт</b><br/>Конверсия: <b>${d[1].toFixed(2)}%</b>`; } },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Продано, шт', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Конверсия, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: pts.map((r, i) => ({ value: [r._orders, r._purchaseConv, i], name: r._name })),
+      symbolSize: d => sizes[d[2]], itemStyle: { color: p => colors[p.data[2]] },
+      emphasis: { scale: 1.5 }
+    }]
+  };
+  createChart('ch-sales-conv-stars', option);
+}
+
+// ---- 4. Revenue per Visit TOP ----
+function renderRevenuePerVisitTop(d) {
+  const items = d.filter(r => r._revenuePerVisit > 0).sort((a, b) => b._revenuePerVisit - a._revenuePerVisit).slice(0, 30);
+  if (!items.length) return;
+  const labels = items.map(r => r._name.length > 22 ? r._name.slice(0, 22) + '…' : r._name);
+  const vals = items.map(r => r._revenuePerVisit);
+  const full = items.map(r => r._name);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const i = p[0].dataIndex; return `<b>${full[i]}</b><br/>Выручка/визит: <b>${vals[i].toFixed(2)} ₽</b>`; } },
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: v => v.toFixed(1) + '₽', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9 } },
+    series: [{
+      type: 'bar', data: vals, barMaxWidth: 18,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#5856d6' }, { offset: 1, color: '#7c7af0' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#3b39b5' } },
+      label: { show: true, position: 'right', formatter: p => p.value.toFixed(1) + '₽', fontSize: 9, color: '#86868b' }
+    }]
+  };
+  createChart('ch-rev-per-visit-top', option);
+}
+
+// ---- 5. Price x Conversion x Revenue Bubble ----
+function renderBubblePriceConvRev(d) {
+  const pts = d.filter(r => r._price >= 30 && r._purchaseConv > 0 && r._revenue > 0);
+  const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
+  const catColors = {};
+  cats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
+  const series = cats.map(cat => ({
+    name: cat, type: 'scatter',
+    data: pts.filter(r => r._category === cat).map(r => ({ value: [r._price, r._purchaseConv, r._revenue], name: r._name })),
+    symbolSize: d => Math.max(4, Math.sqrt(d[2]) * 0.3),
+    itemStyle: { color: catColors[cat], opacity: 0.6 },
+    emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
+  })).filter(s => s.data.length > 0);
+  const option = {
+    tooltip: { formatter: p => {
+      const v = p.data.value; return `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Цена: <b>${fmt(v[0])} ₽</b><br/>Конверсия: <b>${v[1].toFixed(2)}%</b><br/>Выручка: <b>${fmt(v[2])} ₽</b>`; } },
+    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
+    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'log', name: 'Цена, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Конверсия, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: series
+  };
+  createChart('ch-bubble-price-conv', option);
+}
+
+// ---- 6. OOS Losses (Lost Sales vs Days OOS) ----
+function renderOOSLosses(d) {
+  const pts = d.filter(r => r._daysInStock > 0 && r._lost > 0);
+  const option = {
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Дней без остатка: <b>${p.data.value[0]}</b><br/>Потеряно: <b>${fmt(p.data.value[1])} ₽</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'value', name: 'Дней без остатка', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Упущенные продажи, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: pts.map(r => ({ value: [r._daysInStock, r._lost], name: r._name })), symbolSize: 5,
+      itemStyle: { color: 'rgba(255,59,48,0.5)' }, emphasis: { itemStyle: { color: '#ff3b30' }, scale: 1.5 }
+    }]
+  };
+  createChart('ch-oos-losses', option);
+}
+
+// ---- 7. Ad Efficiency (Ad Share vs Revenue) ----
+function renderAdEfficiency(d) {
+  const pts = d.filter(r => r._adShare > 0 && r._revenue > 0);
+  const option = {
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Реклама: <b>${p.data.value[0].toFixed(1)}%</b><br/>Выручка: <b>${fmt(p.data.value[1])} ₽</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'value', name: 'Доля рекламы, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 } },
+    yAxis: { type: 'log', name: 'Выручка, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: pts.map(r => ({ value: [r._adShare, r._revenue], name: r._name })), symbolSize: 5,
+      itemStyle: { color: 'rgba(175,82,222,0.5)' }, emphasis: { itemStyle: { color: '#af52de' }, scale: 1.5 }
+    }]
+  };
+  createChart('ch-ad-efficiency', option);
+}
+
+// ---- 8. Brand Efficiency (Revenue per SKU) ----
+function renderBrandEfficiency(d) {
+  const revMap = {}, skuMap = {};
+  d.forEach(r => { const b = r._brand || 'Другое'; revMap[b] = (revMap[b] || 0) + r._revenue; skuMap[b] = (skuMap[b] || 0) + 1; });
+  let entries = Object.keys(revMap).filter(b => skuMap[b] >= 2).map(b => [b, revMap[b] / skuMap[b]]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  if (!entries.length) return;
+  const labels = entries.map(e => e[0].length > 18 ? e[0].slice(0, 18) + '…' : e[0]);
+  const vals = entries.map(e => e[1]);
+  const full = entries.map(e => e[0]);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const i = p[0].dataIndex; return `<b>${full[i]}</b><br/>Выручка/SKU: <b>${fmt(vals[i])} ₽</b><br/>SKU: ${skuMap[full[i]]}`; } },
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9 } },
+    series: [{
+      type: 'bar', data: vals, barMaxWidth: 18,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#00c7be' }, { offset: 1, color: '#36c9a6' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#00a89e' } },
+      label: { show: true, position: 'right', formatter: p => fmtM(p.value), fontSize: 9, color: '#86868b' }
+    }]
+  };
+  createChart('ch-brand-efficiency', option);
+}
+
+// ---- 9. Weight x Price per Gram Heatmap ----
+function renderWeightPriceGramHeatmap(d) {
+  let pts = d.filter(r => r._weightG > 0 && r._pricePerGram > 0);
+  if (!pts.length) return;
+  const maxW = pts.map(r => r._weightG).sort((a, b) => a - b)[Math.floor(pts.length * 0.97)];
+  const maxPpg = pts.map(r => r._pricePerGram).sort((a, b) => a - b)[Math.floor(pts.length * 0.97)];
+  const wBins = 6, pBins = 6;
+  const wStep = maxW / wBins || 1, pStep = maxPpg / pBins || 0.1;
+  const wLabels = Array.from({ length: wBins }, (_, i) => Math.round(i * wStep) + '–' + Math.round((i + 1) * wStep) + 'г');
+  const pLabels = Array.from({ length: pBins }, (_, i) => (i * pStep).toFixed(1) + '–' + ((i + 1) * pStep).toFixed(1) + '₽');
+  const heat = [];
+  let maxV = 0;
+  for (let wi = 0; wi < wBins; wi++) {
+    for (let pi = 0; pi < pBins; pi++) {
+      const cnt = pts.filter(r => {
+        const wOk = r._weightG >= wi * wStep && (wi === wBins - 1 ? r._weightG <= (wi + 1) * wStep : r._weightG < (wi + 1) * wStep);
+        const pOk = r._pricePerGram >= pi * pStep && (pi === pBins - 1 ? r._pricePerGram <= (pi + 1) * pStep : r._pricePerGram < (pi + 1) * pStep);
+        return wOk && pOk;
+      }).length;
+      if (cnt > maxV) maxV = cnt;
+      heat.push([pi, wi, cnt]);
+    }
+  }
+  const option = {
+    tooltip: { formatter: p => {
+      const d = p.data; return `<b>Вес: ${wLabels[d[1]]}</b><br/>Цена/г: ${pLabels[d[0]]}<br/>Товаров: <b>${d[2]}</b>`; } },
+    grid: { left: 10, right: 20, top: 10, bottom: 50, containLabel: true },
+    xAxis: { type: 'category', data: pLabels, axisLabel: { rotate: 30, fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
+    yAxis: { type: 'category', data: wLabels, axisLabel: { fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
+    visualMap: { min: 0, max: maxV, calculable: true, orient: 'vertical', right: 0, top: 'center', itemHeight: 150,
+      inRange: { color: ['#f0f0f0', '#cce5ff', '#66b3ff', '#0071e3', '#003d79'] }, textStyle: { fontSize: 9 } },
+    series: [{ type: 'heatmap', data: heat, label: { show: maxV <= 30, fontSize: 9 }, emphasis: { itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.15)' } } }]
+  };
+  createChart('ch-weight-ppgram-heat', option);
+}
+
+// ---- 10. Potential Demand Pareto ----
+function renderPotentialDemandPareto(d) {
+  const items = d.filter(r => r._potentialDemand > 0).map(r => ({ name: r._name, val: r._potentialDemand })).sort((a, b) => b.val - a.val);
+  const total = items.reduce((s, r) => s + r.val, 0);
+  let cumSum = 0;
+  const names = items.slice(0, 30).map(r => r.name.length > 18 ? r.name.slice(0, 18) + '…' : r.name);
+  const vals = items.slice(0, 30).map(r => r.val);
+  const cumPct = items.slice(0, 30).map(r => { cumSum += r.val / total * 100; return cumSum; });
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => {
+      const idx = p[0]?.dataIndex ?? 0; const item = items[idx];
+      return `<b>${item?.name || ''}</b><br/>Спрос: <b>${fmt(item?.val || 0)} ₽</b><br/>Доля: ${(item?.val / total * 100).toFixed(1)}% / Накоплено: ${cumPct[idx]?.toFixed(1)}%`; } },
+    grid: { left: 10, right: 50, top: 10, bottom: 40, containLabel: true },
+    xAxis: { type: 'category', data: names, axisLabel: { rotate: 45, fontSize: 8, interval: Math.max(0, Math.floor(names.length / 6)) }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: [
+      { type: 'value', name: 'Спрос, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+      { type: 'value', name: '%', nameTextStyle: { fontSize: 10, color: '#86868b' }, min: 0, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { show: false } }
+    ],
+    series: [
+      { type: 'bar', data: vals, barMaxWidth: 20, itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#ff2d55' }, { offset: 1, color: '#ff6482' }]), borderRadius: [4,4,0,0] }, emphasis: { itemStyle: { color: '#d6203f' } } },
+      { type: 'line', yAxisIndex: 1, data: cumPct, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#ff3b30', width: 2 }, itemStyle: { color: '#ff3b30' }, areaStyle: { color: 'rgba(255,59,48,0.08)' }, label: { show: true, position: 'top', formatter: p => p.value.toFixed(0) + '%', fontSize: 9, color: '#86868b' } }
+    ]
+  };
+  createChart('ch-potential-pareto', option);
+}
+
+// ---- 11. Card Revenue per Visit Ranking (horizontal bar) ----
+function renderCardRevenuePerVisit(d) {
+  renderRevenuePerVisitTop(d); // same data, reuse
+}
+
+// ---- 12. Visits -> Conversion Scatter ----
+function renderVisitsConversion(d) {
+  const pts = d.filter(r => r._visits > 0 && r._purchaseConv > 0);
+  if (!pts.length) return;
+  const medV = pts.map(r => r._visits).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const medC = pts.map(r => r._purchaseConv).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const colors = pts.map(r => {
+    const highV = r._visits >= medV, highC = r._purchaseConv >= medC;
+    return highV && highC ? '#34c759' : highV && !highC ? '#ff9500' : !highV && highC ? '#0071e3' : '#ff3b30';
+  });
+  const option = {
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Визиты: <b>${fmt(p.data.value[0])}</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Посещения', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Конверсия в заказ, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: pts.map(r => ({ value: [r._visits, r._purchaseConv], name: r._name })),
+      symbolSize: 5, itemStyle: { color: p => colors[p.dataIndex] }, emphasis: { scale: 1.5 }
+    }]
+  };
+  createChart('ch-visits-conv', option);
+}
+
+// ---- 13. Cart Conversion -> Order Conversion ----
+function renderCartToOrderConv(d) {
+  const pts = d.filter(r => r._cartConv > 0 && r._purchaseConv > 0);
+  if (!pts.length) return;
+  const option = {
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>В корзину: <b>${p.data.value[0].toFixed(1)}%</b><br/>В заказ: <b>${p.data.value[1].toFixed(2)}%</b>` },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'value', name: 'Конверсия в корзину, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Конверсия в заказ, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: pts.map(r => ({ value: [r._cartConv, r._purchaseConv], name: r._name })), symbolSize: 5,
+      itemStyle: { color: 'rgba(0,199,190,0.5)' }, emphasis: { itemStyle: { color: '#00c7be' }, scale: 1.5 }
+    }]
+  };
+  createChart('ch-cart-order-conv', option);
+}
+
+// ---- 14. Card Funnel (Impressions -> Visits -> Cart -> Orders -> Buyout) ----
+function renderCardFunnel(d) {
+  const impressions = d.reduce((s, r) => s + r._impressions, 0);
+  const visits = d.reduce((s, r) => s + r._visits, 0);
+  const avgCartConv = d.filter(r => r._cartConv > 0).reduce((s, r, _, a) => s + r._cartConv / a.length, 0);
+  const estimatedCarts = visits * (avgCartConv / 100);
+  const orders = d.reduce((s, r) => s + r._orders, 0);
+  const avgBuyout = d.filter(r => r._buyout > 0).reduce((s, r, _, a) => s + r._buyout / a.length, 0);
+  const estimatedBuyouts = orders * (avgBuyout / 100);
+  const data = [
+    { name: 'Показы', value: impressions },
+    { name: 'Визиты', value: visits },
+    { name: 'В корзину', value: Math.round(estimatedCarts) },
+    { name: 'Заказано', value: orders },
+    { name: 'Выкуплено', value: Math.round(estimatedBuyouts) }
+  ];
+  const option = {
+    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${fmt(p.value)} (${p.percent}%)` },
+    series: [{
+      type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%', minSize: '5%', maxSize: '100%', sort: 'descending', gap: 4,
+      label: { show: true, position: 'inside', formatter: p => `${p.name}\n${fmt(p.value)}`, fontSize: 11, color: '#fff', fontWeight: 600 },
+      labelLine: { show: false }, itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 8 },
+      data: data.map((d, i) => ({ ...d, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      emphasis: { itemStyle: { opacity: 0.85 } }
+    }]
+  };
+  createChart('ch-card-funnel', option);
+}
+
+// ---- 15. Traffic x Revenue per Visit Matrix ----
+function renderTrafficRevPerVisit(d) {
+  const pts = d.filter(r => r._visits > 0 && r._revenuePerVisit > 0);
+  if (!pts.length) return;
+  const medV = pts.map(r => r._visits).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const medR = pts.map(r => r._revenuePerVisit).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const colors = pts.map(r => {
+    const highV = r._visits >= medV, highR = r._revenuePerVisit >= medR;
+    return highV && highR ? '#34c759' : highV && !highR ? '#ff9500' : !highV && highR ? '#0071e3' : '#ff3b30';
+  });
+  const names = pts.map(r => r._name);
+  const option = {
+    tooltip: { formatter: p => {
+      const i = p.dataIndex; return `<b>${names[i]}</b><br/>Визиты: <b>${fmt(p.data.value[0])}</b><br/>Выручка/визит: <b>${p.data.value[1].toFixed(2)} ₽</b>`; } },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'log', name: 'Посещения', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Выручка на визит, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '₽', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: pts.map((r, i) => ({ value: [r._visits, r._revenuePerVisit], name: r._name })),
+      symbolSize: 6, itemStyle: { color: p => colors[p.dataIndex] }, emphasis: { scale: 1.5 }
+    }]
+  };
+  createChart('ch-traffic-rev-visit', option);
+}
+
+// ---- 16. Card Efficiency Index ----
+function renderCardEfficiencyIndex(d) {
+  const hasAll = d.filter(r => r._revenuePerVisit > 0 && r._purchaseConv > 0 && r._buyout > 0 && r._ctr > 0);
+  if (hasAll.length < 3) return;
+  const metrics = hasAll.map(r => [r._revenuePerVisit, r._purchaseConv, r._buyout, r._ctr]);
+  const means = [0,0,0,0], stds = [0,0,0,0];
+  const n = hasAll.length;
+  for (let j = 0; j < 4; j++) { means[j] = metrics.reduce((s, m) => s + m[j], 0) / n; }
+  for (let j = 0; j < 4; j++) { stds[j] = Math.sqrt(metrics.reduce((s, m) => s + (m[j] - means[j]) ** 2, 0) / n) || 1; }
+  const scored = hasAll.map((r, i) => {
+    const z = (metrics[i][0] / means[0] + metrics[i][1] / means[1] + metrics[i][2] / means[2] + metrics[i][3] / means[3]) / 4 * 100;
+    return { name: r._name, score: Math.min(100, z) };
+  }).sort((a, b) => b.score - a.score).slice(0, 20);
+  const labels = scored.map(r => r.name.length > 20 ? r.name.slice(0, 20) + '…' : r.name);
+  const vals = scored.map(r => r.score);
+  const full = scored.map(r => r.name);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const i = p[0].dataIndex; return `<b>${full[i]}</b><br/>Индекс: <b>${vals[i].toFixed(1)}</b>`; } },
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9 } },
+    series: [{
+      type: 'bar', data: vals, barMaxWidth: 18,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#af52de' }, { offset: 1, color: '#c47cf0' }]), borderRadius: [0,4,4,0] },
+      emphasis: { itemStyle: { color: '#8b3abf' } },
+      markLine: { silent: true, symbol: 'none', lineStyle: { color: '#34c759', type: 'dashed', width: 1.5 }, data: [{ xAxis: 80, label: { formatter: 'Порог 80', position: 'insideEndTop', fontSize: 9, color: '#34c759' } }] }
+    }]
+  };
+  createChart('ch-card-efficiency', option);
+}
+
 // ======================== CHART DEFINITIONS ========================
 
 function renderCharts() {
   const d = filteredData;
   if (!d.length) return;
+
+  // NEW: 1. Demand x Deficit
+  renderDemandDeficit(d);
+  // NEW: 2. Price per Gram vs Daily Sales
+  renderPricePerGramSales(d);
+  // NEW: 3. Sales x Conversion Stars
+  renderSalesConversionStars(d);
+  // NEW: 4. Revenue per Visit TOP
+  renderRevenuePerVisitTop(d);
+  // NEW: 5. Price x Conversion x Revenue Bubble
+  renderBubblePriceConvRev(d);
+  // NEW: 6. OOS Losses
+  renderOOSLosses(d);
+  // NEW: 7. Ad Efficiency
+  renderAdEfficiency(d);
+  // NEW: 8. Brand Efficiency
+  renderBrandEfficiency(d);
+  // NEW: 9. Weight x Price per Gram Heatmap
+  renderWeightPriceGramHeatmap(d);
+  // NEW: 10. Potential Demand Pareto
+  renderPotentialDemandPareto(d);
+  // NEW: 11. Card Revenue per Visit
+  renderCardRevenuePerVisit(d);
+  // NEW: 12. Visits -> Conversion
+  renderVisitsConversion(d);
+  // NEW: 13. Cart -> Order Conversion
+  renderCartToOrderConv(d);
+  // NEW: 14. Card Funnel
+  renderCardFunnel(d);
+  // NEW: 15. Traffic x Rev per Visit
+  renderTrafficRevPerVisit(d);
+  // NEW: 16. Card Efficiency Index
+  renderCardEfficiencyIndex(d);
 
   // 1. Revenue by category
   renderRevenueByCategory(d);
@@ -1429,6 +1902,69 @@ function populateFilters() {
 
 // ======================== BUILD UI ========================
 const CHART_DEFS = [
+  // === Приоритетная аналитика ===
+  { id: 'ch-demand-deficit', title: 'Матрица «Потенциал спроса × Дефицит»', desc: 'Определение товаров, для которых необходимо увеличить производство и запасы.',
+    help: { shows: 'Точечная диаграмма: ось X — потенциальный спрос (выручка + упущенные продажи), ось Y — коэффициент дефицита (доля упущенных продаж в потенциале). Красные пунктиры — медианы. Цвет — тип кофе.',
+            how: 'Наведите курсор на точку для названия и значений. Верхний правый квадрант — товары с высоким спросом и высоким дефицитом: их нужно производить и завозить в первую очередь.',
+            why: 'Позволяет визуально найти SKU, которые приносят наибольшие потери из-за отсутствия на складе, и установить приоритет пополнения.' } },
+  { id: 'ch-price-gram-sales', title: 'Цена за грамм vs Среднесуточные продажи', desc: 'Анализ ценовой чувствительности покупателей.',
+    help: { shows: 'Точечная диаграмма: ось X — цена за 1 грамм товара, ось Y — среднесуточные продажи в рублях. Цвет — тип кофе. Логарифмические шкалы.',
+            how: 'Наведите курсор для деталей. Линии тренда показывают общую зависимость: падают ли продажи с ростом цены за грамм.',
+            why: 'Помогает оценить эластичность спроса и выбрать оптимальную фасовку: выгоднее продавать маленькие или большие упаковки.' } },
+  { id: 'ch-sales-conv-stars', title: 'Звёзды ассортимента (Продажи × Конверсия)', desc: 'Разделение SKU на лидеров, потенциал и аутсайдеров по двум ключевым метрикам.',
+    help: { shows: 'Точечная диаграмма с 4 квадрантами, разделёнными медианами. Ось X — продажи (шт), ось Y — конверсия в покупку. Зелёные — звёзды, синие — потенциал, оранжевые — улучшить, красные — аутсайдеры.',
+            how: 'Каждая точка — товар. Наведите для названия. Квадранты: верхний правый (звёзды) = много продаж + высокая конверсия. Нижний левый = низкие показатели.',
+            why: 'Быстрое сегментирование ассортимента: на что делать ставку (звёзды), что оптимизировать (низкая конверсия), что развивать (высокая конверсия, мало трафика).' } },
+  { id: 'ch-rev-per-visit-top', title: 'ТОП карточек по выручке на визит', desc: 'Поиск самых эффективных карточек товаров — сколько выручки приносит каждый визит.',
+    help: { shows: 'Горизонтальная столбчатая диаграмма: топ-30 товаров по выручке на одно посещение карточки (₽).',
+            how: 'Наведите на строку для названия. Чем длиннее столбец, тем больше выручки генерирует каждый визит на карточку товара.',
+            why: 'Помогает найти карточки, которые лучше всего конвертируют трафик в деньги — ориентир для оформления других карточек.' } },
+  { id: 'ch-bubble-price-conv', title: 'Цена × Конверсия × Выручка', desc: 'Оценка эффективности ценовой политики на трёх осях одновременно.',
+    help: { shows: 'Пузырьковая диаграмма: ось X — цена (₽), ось Y — конверсия в покупку (%), размер пузырька — выручка (₽), цвет — тип кофе.',
+            how: 'Наведите на пузырёк для деталей. Крупные пузырьки справа-сверху — дорогие товары с высокой конверсией и большой выручкой.',
+            why: 'Показывает, какие ценовые сегменты обеспечивают наилучшее сочетание цены, конверсии и выручки.' } },
+  { id: 'ch-oos-losses', title: 'Потери из-за отсутствия товара (OOS)', desc: 'Выявление SKU, из-за которых теряется наибольшая выручка при отсутствии на складе.',
+    help: { shows: 'Точечная диаграмма: ось X — количество дней без остатка, ось Y — упущенные продажи (₽).',
+            how: 'Наведите на точку для деталей. Точки справа-вверху — товары, которые долго отсутствовали и принесли наибольшие потери.',
+            why: 'Прямые денежные потери от дефицита. Помогает расставить приоритеты при пополнении остатков.' } },
+  { id: 'ch-ad-efficiency', title: 'Эффективность рекламных расходов', desc: 'Поиск товаров с высоким и низким ROI рекламы — окупается ли вложения в продвижение.',
+    help: { shows: 'Точечная диаграмма: ось X — доля рекламных расходов в выручке (%), ось Y — выручка (₽).',
+            how: 'Наведите на точку для деталей. Товары слева-вверху — минимальные затраты на рекламу при высокой выручке. Справа-внизу — много трат, мало отдачи.',
+            why: 'Помогает оценить эффективность рекламных кампаний и найти товары, где реклама не окупается.' } },
+  { id: 'ch-brand-efficiency', title: 'Эффективность брендов (Выручка на SKU)', desc: 'Сравнение эффективности ассортимента брендов — какой бренд приносит больше выручки на одну позицию.',
+    help: { shows: 'Горизонтальная диаграмма: топ-20 брендов по средней выручке на один товар (SKU). Для брендов с 2+ SKU.',
+            how: 'Наведите для названия и точной выручки на SKU. Высокое значение = эффективный ассортимент (мало товаров, много денег).',
+            why: 'Показывает, какие бренды имеют наиболее эффективную структуру ассортимента. Низкое значение при большом числе SKU = размытый ассортимент.' } },
+  { id: 'ch-weight-ppgram-heat', title: 'Heatmap «Вес упаковки × Цена за грамм»', desc: 'Поиск свободных рыночных ниш по сочетанию веса и цены за грамм.',
+    help: { shows: 'Тепловая карта: ось X — цена за грамм (₽), ось Y — вес упаковки (г). Цвет ячейки — количество товаров: чем темнее, тем больше конкурентов.',
+            how: 'Наведите на ячейку для числа товаров. Светлые ячейки = свободные ниши с малым числом предложений.',
+            why: 'Помогает найти незанятые рыночные ниши по сочетанию веса и цены за грамм — точки входа для нового товара.' } },
+  { id: 'ch-potential-pareto', title: 'Pareto потенциального спроса', desc: 'Определение товаров, которые необходимо всегда держать в наличии — 20% товаров дают 80% спроса.',
+    help: { shows: 'Комбинированный график: столбцы — потенциальный спрос товаров (отсортированы по убыванию), красная линия — накопленная доля. В отличие от обычного Pareto, учитывает и упущенные продажи.',
+            how: 'Смотрите на красную линию: где пересекает 80% — граница товаров группы A. Наведите для точных значений.',
+            why: 'Показывает, товары с каким потенциальным спросом нужно всегда держать в наличии, чтобы не терять максимальную выручку.' } },
+  // === Эффективность карточки товара ===
+  { id: 'ch-visits-conv', title: 'Посещаемость → Конверсия', desc: 'Поиск карточек с недостаточным трафиком или низкой конверсией.',
+    help: { shows: 'Точечная диаграмма с 4 квадрантами: ось X — посещения карточки (логарифм), ось Y — конверсия в заказ (%). Цвет: зелёный (звёзды), синий (потенциал), оранжевый (улучшить трафик), красный (аутсайдеры).',
+            how: 'Квадранты: высокий трафик + высокая конверсия = отличная карточка. Высокий трафик + низкая конверсия = нужно улучшать контент. Низкий трафик + высокая конверсия = нужно наращивать показы.',
+            why: 'Разделяет карточки на 4 типа, для каждого из которых своя стратегия улучшения.' } },
+  { id: 'ch-cart-order-conv', title: 'Конверсия в корзину → Конверсия в заказ', desc: 'Анализ потерь между этапами воронки: добавление в корзину vs оформление заказа.',
+    help: { shows: 'Точечная диаграмма: ось X — конверсия в корзину из карточки (%), ось Y — конверсия в заказ (%). Каждая точка — товар.',
+            how: 'Точки выше линии X=Y — товары, где отличная конверсия в заказ при среднем добавлении в корзину. Точки ниже — много кладут в корзину, но мало покупают.',
+            why: 'Помогает найти карточки, где теряются покупатели на финальном этапе — проблема с ценой, доставкой или оформлением заказа.' } },
+  { id: 'ch-card-funnel', title: 'Воронка карточки товара', desc: 'Выявление этапа, где теряется больше всего покупателей — от показа до выкупа.',
+    help: { shows: 'Воронка из 5 этапов: Показы → Визиты → В корзину → Заказано → Выкуплено. Ширина пропорциональна числу событий.',
+            how: 'Сравните соседние этапы: самый большой разрыв — главная точка потерь. Наведите на блок для деталей.',
+            why: 'Показывает полный путь покупателя и выявляет самый проблемный этап, на котором нужно сфокусировать улучшения.' } },
+  { id: 'ch-traffic-rev-visit', title: 'Матрица «Трафик × Выручка на визит»', desc: 'Разделение карточек на лидеры, потенциал, оптимизацию и аутсайдеры.',
+    help: { shows: 'Точечная диаграмма с 4 квадрантами: ось X — посещения, ось Y — выручка на визит (₽). Зелёные = лидеры, синие = потенциал, оранжевые = нужна оптимизация, красные = аутсайдеры.',
+            how: 'Верхний правый квадрант — звёзды (много трафика + высокая монетизация). Верхний левый — мало трафика, но эффективные. Нижний правый — много трафика, низкая отдача.',
+            why: 'Наглядное разделение стратегий для каждого типа карточек.' } },
+  { id: 'ch-card-efficiency', title: 'Индекс эффективности карточки', desc: 'Комплексная оценка качества карточки на основе 4 метрик: выручка/визит, конверсия, выкуп, CTR.',
+    help: { shows: 'Горизонтальная диаграмма: топ-20 карточек по сводному индексу эффективности. Зелёная пунктирная линия — порог 80 (эффективная карточка).',
+            how: 'Индекс рассчитывается как среднее нормированных значений 4 метрик (относительно среднего по рынку). Наведите на строку для точного значения.',
+            why: 'Единая метрика качества карточки, учитывающая и трафик, и конверсию, и монетизацию, и выкуп. Помогает быстро найти лучшие и худшие карточки.' } },
+  // === Существующие графики ===
   { id: 'ch-revenue-cat', title: 'Выручка по категориям кофе', desc: 'Какой тип кофе приносит больше денег — растворимый, зерновой или молотый. Помогает понять, на чём стоит сфокусироваться.',
     help: { shows: 'Столбчатая диаграмма: по горизонтали — типы кофе (растворимый, зерновой, молотый), по вертикали — суммарная выручка в рублях. Длина столбца = общей выручке всех товаров этого типа за 28 дней.',
             how: 'Наведите курсор на столбец, чтобы увидеть точную сумму и долю в процентах от всей выручки. Кликните по столбцу, чтобы отфильтровать все графики по этой категории.',
@@ -1559,7 +2095,20 @@ function closeChartHelp() {
 
 function buildUI() {
   const grid = document.getElementById('chartsGrid');
+  const sections = [
+    { firstId: 'ch-demand-deficit', title: 'Приоритетная аналитика', desc: 'Ключевые матрицы для аналитика и руководителя производства' },
+    { firstId: 'ch-visits-conv', title: 'Эффективность карточки товара', desc: 'Оценка качества карточек и воронка продаж' },
+    { firstId: 'ch-revenue-cat', title: 'Детальная аналитика', desc: 'Все существующие графики для глубокого анализа' }
+  ];
+  let secIdx = 0;
   CHART_DEFS.forEach(c => {
+    if (secIdx < sections.length && c.id === sections[secIdx].firstId) {
+      const header = document.createElement('div');
+      header.className = 'section-header';
+      header.innerHTML = `<h2>${sections[secIdx].title}</h2><p>${sections[secIdx].desc}</p>`;
+      grid.appendChild(header);
+      secIdx++;
+    }
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.id = 'card-' + c.id;
