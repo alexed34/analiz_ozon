@@ -265,7 +265,7 @@ function parseJSONData(json) {
 // ======================== INDEXEDDB CACHE ========================
 const DB_NAME = 'coffeeDashboard';
 const DB_STORE = 'dataset';
-const DB_CACHE_KEY = 'main_13ddcac';
+const DB_CACHE_KEY = 'main_14ddcac';
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -313,7 +313,7 @@ async function loadData() {
     if (cached && cached.lastModified) reqHeaders['If-Modified-Since'] = cached.lastModified;
     let resp;
     try {
-      resp = await fetch('data.json?v=13ddcac', { headers: reqHeaders });
+      resp = await fetch('data.json?v=14ddcac', { headers: reqHeaders });
     } catch (netErr) {
       if (cached && cached.data && cached.data.length) {
         allData = cached.data;
@@ -338,7 +338,9 @@ async function loadData() {
     const lm = resp.headers.get('last-modified');
     try { await setCached({ data: allData, lastModified: lm, period: DATA_PERIOD }); } catch (_) {}
     const label = (cached && cached.data && cached.data.length) ? 'данные обновлены' : 'Интерактивная аналитика';
-    document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · ' + DATA_PERIOD + ' · ' + label;
+    const hasDerived = allData.some(r => r._potentialDemand > 0);
+    const warning = hasDerived ? '' : ' ⚠ Производные поля отсутствуют — перезапустите parse_to_csv.py';
+    document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · ' + DATA_PERIOD + ' · ' + label + warning;
     initDashboard();
   } catch (e) {
     document.getElementById('subtitle').textContent = 'Ошибка загрузки data.json — ' + e.message + '. Запустите локальный сервер.';
@@ -556,7 +558,7 @@ function handleChartClick(sourceId, params) {
   if (!name) return;
   let field = null;
   let value = name;
-  if (sourceId === 'ch-revenue-cat' || sourceId === 'ch-daily-sales' || sourceId === 'ch-category-dist' || sourceId === 'ch-buyout-cat' || sourceId === 'ch-price-box') {
+  if (sourceId === 'ch-revenue-cat' || sourceId === 'ch-daily-sales' || sourceId === 'ch-category-dist' || sourceId === 'ch-buyout-cat') {
     field = '_category';
   } else if (sourceId === 'ch-top-brands' || sourceId === 'ch-lost-sales' || sourceId === 'ch-brand-orders' || sourceId === 'ch-ad-share' || sourceId === 'ch-cart-conv') {
     field = '_brand';
@@ -581,17 +583,25 @@ function handleChartClick(sourceId, params) {
 // ---- 1. Potential Demand x Deficit Ratio ----
 function renderDemandDeficit(d) {
   const pts = d.filter(r => r._potentialDemand > 0 && r._deficitRatio > 0);
+  const descEl = document.getElementById('card-ch-demand-deficit')?.querySelector('.chart-desc');
+  if (descEl) descEl.textContent = pts.length + ' товаров с дефицитом · цвет — тип кофе';
+  if (!pts.length) return;
   const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
   const catColors = {};
   cats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
-  const medDemand = pts.map(r => r._potentialDemand).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
-  const medDeficit = pts.map(r => r._deficitRatio).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
+  const demandSorted = pts.map(r => r._potentialDemand).sort((a, b) => a - b);
+  const deficitSorted = pts.map(r => r._deficitRatio).sort((a, b) => a - b);
+  const medDemand = demandSorted[Math.floor(pts.length / 2)];
+  const medDeficit = deficitSorted[Math.floor(pts.length / 2)];
+  const minDemand = demandSorted[0];
+  const maxDemand = demandSorted[demandSorted.length - 1];
   const series = cats.map(cat => ({
     name: cat, type: 'scatter',
     data: pts.filter(r => r._category === cat).map(r => ({ value: [r._potentialDemand, r._deficitRatio], name: r._name })),
     symbolSize: 5, itemStyle: { color: catColors[cat], opacity: 0.6 },
     emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
   })).filter(s => s.data.length > 0);
+  if (!series.length) return;
   const option = {
     tooltip: { formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Спрос: <b>${fmt(p.data.value[0])} ₽</b><br/>Дефицит: <b>${p.data.value[1].toFixed(1)}%</b>` },
     legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
@@ -599,8 +609,8 @@ function renderDemandDeficit(d) {
     xAxis: { type: 'log', name: 'Потенциальный спрос, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
     yAxis: { type: 'value', name: 'Коэфф. дефицита, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
     series: series.concat([
-      { type: 'line', data: [[0, medDeficit], [Math.max(...pts.map(r => r._potentialDemand)), medDeficit]], symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 }, silent: true },
-      { type: 'line', data: [[medDemand, 0], [medDemand, 100]], symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 }, silent: true }
+      { type: 'line', data: [[minDemand, medDeficit], [maxDemand, medDeficit]], symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 }, silent: true },
+      { type: 'line', data: [[medDemand, 0.1], [medDemand, 100]], symbol: 'none', lineStyle: { color: '#ff3b30', type: 'dashed', width: 1 }, silent: true }
     ])
   };
   createChart('ch-demand-deficit', option);
@@ -632,25 +642,18 @@ function renderPricePerGramSales(d) {
 // ---- 3. Sales x Conversion Stars (4 quadrants) ----
 function renderSalesConversionStars(d) {
   const pts = d.filter(r => r._orders > 0 && r._purchaseConv > 0);
+  const dc = document.getElementById('card-ch-sales-conv-stars')?.querySelector('.chart-desc');
+  if (dc) dc.textContent = pts.length + ' товаров · конверсия > 0';
   if (!pts.length) return;
-  const medSales = pts.map(r => r._orders).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
-  const medConv = pts.map(r => r._purchaseConv).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
-  const colors = pts.map(r => {
-    const highS = r._orders >= medSales, highC = r._purchaseConv >= medConv;
-    return highS && highC ? '#34c759' : highS && !highC ? '#ff9500' : !highS && highC ? '#0071e3' : '#ff3b30';
-  });
-  const names = pts.map(r => r._name);
-  const sizes = pts.map(r => Math.max(6, Math.log10(r._revenue + 1) * 3));
   const option = {
-    tooltip: { formatter: p => {
-      const d = p.data; const i = d[2]; return `<b>${names[i]}</b><br/>Продажи: <b>${fmt(d[0])} шт</b><br/>Конверсия: <b>${d[1].toFixed(2)}%</b>`; } },
+    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Продажи: <b>${fmt(p.data.value[0])} шт</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'log', name: 'Продано, шт', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
     yAxis: { type: 'value', name: 'Конверсия, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
     series: [{
-      type: 'scatter', data: pts.map((r, i) => ({ value: [r._orders, r._purchaseConv, i], name: r._name })),
-      symbolSize: d => sizes[d[2]], itemStyle: { color: p => colors[p.data[2]] },
-      emphasis: { scale: 1.5 }
+      type: 'scatter', data: pts.map(r => ({ value: [r._orders, r._purchaseConv], name: r._name })),
+      symbolSize: 6, itemStyle: { color: 'rgba(0,113,227,0.5)' },
+      emphasis: { itemStyle: { color: '#0071e3' }, scale: 1.5 }
     }]
   };
   createChart('ch-sales-conv-stars', option);
@@ -679,32 +682,7 @@ function renderRevenuePerVisitTop(d) {
   createChart('ch-rev-per-visit-top', option);
 }
 
-// ---- 5. Price x Conversion x Revenue Bubble ----
-function renderBubblePriceConvRev(d) {
-  const pts = d.filter(r => r._price >= 30 && r._purchaseConv > 0 && r._revenue > 0);
-  const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
-  const catColors = {};
-  cats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
-  const series = cats.map(cat => ({
-    name: cat, type: 'scatter',
-    data: pts.filter(r => r._category === cat).map(r => ({ value: [r._price, r._purchaseConv, r._revenue], name: r._name })),
-    symbolSize: d => Math.max(4, Math.sqrt(d[2]) * 0.3),
-    itemStyle: { color: catColors[cat], opacity: 0.6 },
-    emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
-  })).filter(s => s.data.length > 0);
-  const option = {
-    tooltip: { formatter: p => {
-      const v = p.data.value; return `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Цена: <b>${fmt(v[0])} ₽</b><br/>Конверсия: <b>${v[1].toFixed(2)}%</b><br/>Выручка: <b>${fmt(v[2])} ₽</b>`; } },
-    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
-    grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
-    xAxis: { type: 'log', name: 'Цена, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
-    yAxis: { type: 'value', name: 'Конверсия, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
-    series: series
-  };
-  createChart('ch-bubble-price-conv', option);
-}
-
-// ---- 6. OOS Losses (Lost Sales vs Days OOS) ----
+// ---- 5. OOS Losses (Lost Sales vs Days OOS) ----
 function renderOOSLosses(d) {
   const pts = d.filter(r => r._daysInStock > 0 && r._lost > 0);
   const option = {
@@ -761,41 +739,7 @@ function renderBrandEfficiency(d) {
   createChart('ch-brand-efficiency', option);
 }
 
-// ---- 9. Weight x Price per Gram Heatmap ----
-function renderWeightPriceGramHeatmap(d) {
-  let pts = d.filter(r => r._weightG > 0 && r._pricePerGram > 0);
-  if (!pts.length) return;
-  const maxW = pts.map(r => r._weightG).sort((a, b) => a - b)[Math.floor(pts.length * 0.97)];
-  const maxPpg = pts.map(r => r._pricePerGram).sort((a, b) => a - b)[Math.floor(pts.length * 0.97)];
-  const wBins = 6, pBins = 6;
-  const wStep = maxW / wBins || 1, pStep = maxPpg / pBins || 0.1;
-  const wLabels = Array.from({ length: wBins }, (_, i) => Math.round(i * wStep) + '–' + Math.round((i + 1) * wStep) + 'г');
-  const pLabels = Array.from({ length: pBins }, (_, i) => (i * pStep).toFixed(1) + '–' + ((i + 1) * pStep).toFixed(1) + '₽');
-  const heat = [];
-  let maxV = 0;
-  for (let wi = 0; wi < wBins; wi++) {
-    for (let pi = 0; pi < pBins; pi++) {
-      const cnt = pts.filter(r => {
-        const wOk = r._weightG >= wi * wStep && (wi === wBins - 1 ? r._weightG <= (wi + 1) * wStep : r._weightG < (wi + 1) * wStep);
-        const pOk = r._pricePerGram >= pi * pStep && (pi === pBins - 1 ? r._pricePerGram <= (pi + 1) * pStep : r._pricePerGram < (pi + 1) * pStep);
-        return wOk && pOk;
-      }).length;
-      if (cnt > maxV) maxV = cnt;
-      heat.push([pi, wi, cnt]);
-    }
-  }
-  const option = {
-    tooltip: { formatter: p => {
-      const d = p.data; return `<b>Вес: ${wLabels[d[1]]}</b><br/>Цена/г: ${pLabels[d[0]]}<br/>Товаров: <b>${d[2]}</b>`; } },
-    grid: { left: 10, right: 20, top: 10, bottom: 50, containLabel: true },
-    xAxis: { type: 'category', data: pLabels, axisLabel: { rotate: 30, fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
-    yAxis: { type: 'category', data: wLabels, axisLabel: { fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
-    visualMap: { min: 0, max: maxV, calculable: true, orient: 'vertical', right: 0, top: 'center', itemHeight: 150,
-      inRange: { color: ['#f0f0f0', '#cce5ff', '#66b3ff', '#0071e3', '#003d79'] }, textStyle: { fontSize: 9 } },
-    series: [{ type: 'heatmap', data: heat, label: { show: maxV <= 30, fontSize: 9 }, emphasis: { itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.15)' } } }]
-  };
-  createChart('ch-weight-ppgram-heat', option);
-}
+
 
 // ---- 10. Potential Demand Pareto ----
 function renderPotentialDemandPareto(d) {
@@ -968,17 +912,13 @@ function renderCharts() {
   renderSalesConversionStars(d);
   // NEW: 4. Revenue per Visit TOP
   renderRevenuePerVisitTop(d);
-  // NEW: 5. Price x Conversion x Revenue Bubble
-  renderBubblePriceConvRev(d);
-  // NEW: 6. OOS Losses
+  // NEW: 5. OOS Losses
   renderOOSLosses(d);
   // NEW: 7. Ad Efficiency
   renderAdEfficiency(d);
   // NEW: 8. Brand Efficiency
   renderBrandEfficiency(d);
-  // NEW: 9. Weight x Price per Gram Heatmap
-  renderWeightPriceGramHeatmap(d);
-  // NEW: 10. Potential Demand Pareto
+  // NEW: 9. Potential Demand Pareto
   renderPotentialDemandPareto(d);
   // NEW: 11. Card Revenue per Visit
   renderCardRevenuePerVisit(d);
@@ -1013,11 +953,7 @@ function renderCharts() {
   renderShowsVisits(d);
   // 10. Top-20 lost sales
   renderLostSales(d);
-  // 11. Correlation matrix
-  renderCorrelation(d);
-  // 12. Price x Category heatmap
-  renderHeatmap(d);
-  // 13. Category SKU distribution
+  // 11. Category SKU distribution
   renderCategoryDist(d);
   // 14. Top-20 brands by orders
   renderBrandOrders(d);
@@ -1035,9 +971,7 @@ function renderCharts() {
   renderSuperCompare(d);
   // 21. Weight vs Price scatter
   renderWeightPrice(d);
-  // 22. Price boxplot by category
-  renderPriceBoxplot(d);
-  // 23. Dynamics waterfall
+  // 22. Dynamics waterfall
   renderDynamicsWaterfall(d);
   // 24. Shows vs Revenue
   renderShowsRevenue(d);
@@ -1326,111 +1260,7 @@ function renderLostSales(d) {
   createChart('ch-lost-sales', option);
 }
 
-// ---------- 11. Correlation Matrix ----------
-function renderCorrelation(d) {
-  const fields = [
-    { key: '_price', label: 'Цена' },
-    { key: '_orders', label: 'Продажи' },
-    { key: '_revenue', label: 'Выручка' },
-    { key: '_buyout', label: 'Выкуп' },
-    { key: '_adShare', label: 'Реклама' },
-    { key: '_impressions', label: 'Показы' },
-    { key: '_visits', label: 'Визиты' },
-    { key: '_cartConv', label: 'Конв.корз' },
-    { key: '_volume', label: 'Объем' },
-    { key: '_dailySales', label: 'ADS ₽' }
-  ];
-  const dataMap = {};
-  fields.forEach(f => { dataMap[f.key] = d.filter(r => r[f.key] > 0).map(r => r[f.key]); });
-  function pearson(x, y) {
-    const n = Math.min(x.length, y.length);
-    if (n < 3) return 0;
-    const sx = x.slice(0, n), sy = y.slice(0, n);
-    const mx = sx.reduce((a, b) => a + b, 0) / n;
-    const my = sy.reduce((a, b) => a + b, 0) / n;
-    let num = 0, dx2 = 0, dy2 = 0;
-    for (let i = 0; i < n; i++) {
-      const dx = sx[i] - mx, dy = sy[i] - my;
-      num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
-    }
-    return dx2 && dy2 ? num / Math.sqrt(dx2 * dy2) : 0;
-  }
-  const corrData = [];
-  const labels = fields.map(f => f.label);
-  fields.forEach((f1, i) => {
-    fields.forEach((f2, j) => {
-      corrData.push([i, j, pearson(dataMap[f1.key], dataMap[f2.key]).toFixed(2)]);
-    });
-  });
-  const option = {
-    tooltip: { formatter: p => {
-      const v = p.data; return `<b>${labels[v[0]]} ↔ ${labels[v[1]]}</b><br/>Корреляция: <b>${v[2]}</b>`;
-    }},
-    grid: { left: 60, right: 20, top: 10, bottom: 50 },
-    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
-    yAxis: { type: 'category', data: labels, axisLabel: { fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
-    visualMap: {
-      min: -1, max: 1, calculable: true, orient: 'vertical', right: 0, top: 'center', itemHeight: 150,
-      inRange: { color: ['#ff3b30', '#fff', '#34c759'] },
-      textStyle: { fontSize: 9 }
-    },
-    series: [{
-      type: 'heatmap', data: corrData, label: { show: true, fontSize: 9, color: '#1d1d1f', fontWeight: 600 },
-      emphasis: { itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.15)' } }
-    }]
-  };
-  createChart('ch-correlation', option);
-}
-
-// ---------- 12. Price x Category Heatmap ----------
-function renderHeatmap(d) {
-  const categories = [...new Set(d.map(r => r._category))].filter(Boolean).sort();
-  let allPrices = d.map(r => r._price).filter(p => p > 0).sort((a, b) => a - b);
-  const maxPrice = allPrices.length ? allPrices[Math.floor(allPrices.length * 0.97)] : 5000;
-  const binCount = 6;
-  const binStep = maxPrice / binCount || 1;
-  const bins = [];
-  for (let i = 0; i < binCount; i++) {
-    const lo = Math.round(i * binStep);
-    const hi = Math.round((i + 1) * binStep);
-    bins.push(`${lo.toLocaleString()}—${hi.toLocaleString()}`);
-  }
-  const heatData = [];
-  let maxVal = 0;
-  categories.forEach((cat, ci) => {
-    const catItems = d.filter(r => r._category === cat && r._price >= 30);
-    for (let bi = 0; bi < binCount; bi++) {
-      const lo = bi * binStep;
-      const hi = (bi + 1) * binStep;
-      const items = catItems.filter(r => r._price >= lo && (bi === binCount - 1 ? r._price <= hi : r._price < hi));
-      const val = items.length;
-      if (val > maxVal) maxVal = val;
-      heatData.push([bi, ci, val]);
-    }
-  });
-  const option = {
-    tooltip: { formatter: p => {
-      const d = p.data;
-      return `<b>${categories[d[1]]}</b><br/>Цена: ${bins[d[0]]}<br/>Товаров: <b>${d[2]}</b>`;
-    }},
-    grid: { left: 10, right: 20, top: 10, bottom: 50, containLabel: true },
-    xAxis: { type: 'category', data: bins, axisLabel: { rotate: 30, fontSize: 9 }, axisLine: { show: false }, splitArea: { show: true } },
-    yAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10 }, axisLine: { show: false }, splitArea: { show: true } },
-    visualMap: {
-      min: 0, max: maxVal, calculable: true, orient: 'vertical', right: 0, top: 'center', itemHeight: 150,
-      inRange: { color: ['#f0f0f0', '#cce5ff', '#66b3ff', '#0071e3', '#003d79'] },
-      textStyle: { fontSize: 9 }
-    },
-    series: [{
-      type: 'heatmap', data: heatData,
-      label: { show: maxVal <= 50, fontSize: 10, color: '#1d1d1f' },
-      emphasis: { itemStyle: { shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.15)' } }
-    }]
-  };
-  createChart('ch-heatmap', option);
-}
-
-// ---------- 13. Category SKU Distribution ----------
+// ---------- 11. Category SKU Distribution ----------
 function renderCategoryDist(d) {
   const map = {};
   d.forEach(r => { const k = r._category || 'Другое'; map[k] = (map[k] || 0) + 1; });
@@ -1676,45 +1506,7 @@ function renderWeightPrice(d) {
   createChart('ch-weight-price', option);
 }
 
-// ---------- 22. Price Boxplot by Category ----------
-function renderPriceBoxplot(d) {
-  const cats = [...new Set(d.map(r => r._category))].filter(Boolean);
-  const stickData = [];
-  const medData = [];
-  const labels = [];
-  cats.forEach(c => {
-    const prices = d.filter(r => r._category === c && r._price >= 30).map(r => r._price).sort((a, b) => a - b);
-    if (prices.length < 5) return;
-    labels.push(c);
-    const q1 = prices[Math.floor(prices.length * 0.25)];
-    const q2 = prices[Math.floor(prices.length * 0.5)];
-    const q3 = prices[Math.floor(prices.length * 0.75)];
-    const iqr = q3 - q1;
-    const lo = Math.max(prices[0], q1 - 1.5 * iqr);
-    const hi = Math.min(prices[prices.length - 1], q3 + 1.5 * iqr);
-    stickData.push([q1, q3, lo, hi]);
-    medData.push(q2);
-  });
-  if (!stickData.length) return;
-  const option = {
-    tooltip: { trigger: 'axis', formatter: p => {
-      const idx = p[0]?.dataIndex ?? 0;
-      const sd = stickData[idx];
-      const md = medData[idx];
-      return `<b>${labels[idx]}</b><br/>Мин: <b>${fmt(sd[2])} \u20BD</b><br/>Q1: <b>${fmt(sd[0])} \u20BD</b><br/>Медиана: <b>${fmt(md)} \u20BD</b><br/>Q3: <b>${fmt(sd[1])} \u20BD</b><br/>Макс: <b>${fmt(sd[3])} \u20BD</b>`;
-    }},
-    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
-    xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
-    yAxis: { type: 'value', name: 'Цена, \u20BD', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
-    series: [
-      { type: 'candlestick', data: stickData, barWidth: '50%', itemStyle: { color: '#0071e3', color0: '#0071e3', borderColor: '#005bbf', borderColor0: '#005bbf', borderWidth: 1.5 }, emphasis: { itemStyle: { color: '#40a9ff', color0: '#40a9ff' } } },
-      { type: 'scatter', data: medData, symbol: 'diamond', symbolSize: 12, itemStyle: { color: '#fff', borderColor: '#005bbf', borderWidth: 2 }, emphasis: { scale: 1.5 } }
-    ]
-  };
-  createChart('ch-price-box', option);
-}
-
-// ---------- 23. Waterfall: Top Dynamics ----------
+// ---------- 22. Waterfall: Top Dynamics ----------
 function renderDynamicsWaterfall(d) {
   const items = d.map(r => ({ name: r._name, val: r._dynamics }))
     .filter(r => r.val !== 0)
@@ -1919,10 +1711,6 @@ const CHART_DEFS = [
     help: { shows: 'Горизонтальная столбчатая диаграмма: топ-30 товаров по выручке на одно посещение карточки (₽).',
             how: 'Наведите на строку для названия. Чем длиннее столбец, тем больше выручки генерирует каждый визит на карточку товара.',
             why: 'Помогает найти карточки, которые лучше всего конвертируют трафик в деньги — ориентир для оформления других карточек.' } },
-  { id: 'ch-bubble-price-conv', title: 'Цена × Конверсия × Выручка', desc: 'Оценка эффективности ценовой политики на трёх осях одновременно.',
-    help: { shows: 'Пузырьковая диаграмма: ось X — цена (₽), ось Y — конверсия в покупку (%), размер пузырька — выручка (₽), цвет — тип кофе.',
-            how: 'Наведите на пузырёк для деталей. Крупные пузырьки справа-сверху — дорогие товары с высокой конверсией и большой выручкой.',
-            why: 'Показывает, какие ценовые сегменты обеспечивают наилучшее сочетание цены, конверсии и выручки.' } },
   { id: 'ch-oos-losses', title: 'Потери из-за отсутствия товара (OOS)', desc: 'Выявление SKU, из-за которых теряется наибольшая выручка при отсутствии на складе.',
     help: { shows: 'Точечная диаграмма: ось X — количество дней без остатка, ось Y — упущенные продажи (₽).',
             how: 'Наведите на точку для деталей. Точки справа-вверху — товары, которые долго отсутствовали и принесли наибольшие потери.',
@@ -1935,10 +1723,6 @@ const CHART_DEFS = [
     help: { shows: 'Горизонтальная диаграмма: топ-20 брендов по средней выручке на один товар (SKU). Для брендов с 2+ SKU.',
             how: 'Наведите для названия и точной выручки на SKU. Высокое значение = эффективный ассортимент (мало товаров, много денег).',
             why: 'Показывает, какие бренды имеют наиболее эффективную структуру ассортимента. Низкое значение при большом числе SKU = размытый ассортимент.' } },
-  { id: 'ch-weight-ppgram-heat', title: 'Heatmap «Вес упаковки × Цена за грамм»', desc: 'Поиск свободных рыночных ниш по сочетанию веса и цены за грамм.',
-    help: { shows: 'Тепловая карта: ось X — цена за грамм (₽), ось Y — вес упаковки (г). Цвет ячейки — количество товаров: чем темнее, тем больше конкурентов.',
-            how: 'Наведите на ячейку для числа товаров. Светлые ячейки = свободные ниши с малым числом предложений.',
-            why: 'Помогает найти незанятые рыночные ниши по сочетанию веса и цены за грамм — точки входа для нового товара.' } },
   { id: 'ch-potential-pareto', title: 'Pareto потенциального спроса', desc: 'Определение товаров, которые необходимо всегда держать в наличии — 20% товаров дают 80% спроса.',
     help: { shows: 'Комбинированный график: столбцы — потенциальный спрос товаров (отсортированы по убыванию), красная линия — накопленная доля. В отличие от обычного Pareto, учитывает и упущенные продажи.',
             how: 'Смотрите на красную линию: где пересекает 80% — граница товаров группы A. Наведите для точных значений.',
@@ -2005,14 +1789,6 @@ const CHART_DEFS = [
     help: { shows: 'Горизонтальная диаграмма 20 брендов с наибольшими упущенными продажами (выручка, которую не получили из-за out-of-stock).',
             how: 'Наведите курсор на строку для точной суммы. Кликните по строке, чтобы отфильтровать дашборд по этому бренду.',
             why: 'Показывает прямые денежные потери от отсутствия товара на складе. Помогает расставить приоритеты при пополнении остатков.' } },
-  { id: 'ch-correlation', title: 'Корреляционная матрица', desc: 'Связаны ли разные показатели между собой. Например: чем выше цена — тем реже выкупают? Чем больше рекламы — тем больше продаж?',
-    help: { shows: 'Тепловая карта: по осям — показатели (цена, продажи, выручка, выкуп, реклама и др.). Цвет ячейки = коэффициент корреляции от −1 (красный) до +1 (зелёный).',
-            how: 'Наведите курсор на ячейку, чтобы увидеть пару показателей и значение корреляции. Зелёные ячейки — сильная прямая связь, красные — обратная, белые — связи нет.',
-            why: 'Помогает понять причинно-следственные связи: например, растёт ли выручка с рекламой или падает выкуп с ростом цены. Ориентир для гипотез.' } },
-  { id: 'ch-heatmap', title: 'Heatmap «Цена × Категория»', desc: 'Сколько товаров каждой категории продаётся в разных ценовых диапазонах. Помогает выбрать правильную цену для своего товара.',
-    help: { shows: 'Тепловая карта: по оси X — ценовые диапазоны, по оси Y — типы кофе, цвет ячейки — количество товаров в этой ячейке (темнее = больше).',
-            how: 'Наведите курсор на ячейку, чтобы увидеть категорию, диапазон цен и число товаров. Яркие зоны — наиболее «забитые» ценовые ниши.',
-            why: 'Помогает выбрать цену для нового товара: найти перенасыщенные диапазоны (высокая конкуренция) или свободные ниши.' } },
   { id: 'ch-category-dist', title: 'Доля SKU по типам кофе', desc: 'Сколько товаров каждого типа кофе представлено на площадке. Показывает насыщенность сегментов: растворимый, зерновой, молотый.',
     help: { shows: 'Кольцевая диаграмма (donut): каждый сектор — тип кофе, его размер пропорционален числу товаров (SKU) этого типа.',
             how: 'Наведите курсор на сектор, чтобы увидеть количество товаров и их долю в процентах. Кликните по сектору для фильтрации по категории.',
@@ -2049,10 +1825,6 @@ const CHART_DEFS = [
     help: { shows: 'Точечная диаграмма: ось X — вес упаковки (г), ось Y — цена (₽), цвет — тип кофе. Каждая точка — товар.',
             how: 'Наведите курсор на точку для деталей. Легенда внизу скрывает/показывает типы кофе. Наклон облака показывает, дорожает ли кофе с ростом веса.',
             why: 'Помогает сравнить цену за грамм между сегментами и понять, выгоднее ли покупателям большая или малая упаковка.' } },
-  { id: 'ch-price-box', title: 'Boxplot цен по типам кофе', desc: 'Разброс цен внутри каждого типа кофе: медиана, квартили, выбросы. Помогает понять ценовое позиционирование.',
-    help: { shows: 'Ящик с усами (boxplot) для каждого типа кофе: ромб — медиана (типичная цена), ящик — диапазон от 25% до 75% товаров, усы — минимум и максимум без выбросов.',
-            how: 'Наведите курсор на график для точных значений (мин, Q1, медиана, Q3, макс). Сравните ящики разных категорий по высоте и ширине.',
-            why: 'Показывает ценовое позиционирование сегментов: где цены плотнее (узкий ящик), а где разброс больше. Помогает выбрать нишу по цене.' } },
   { id: 'ch-dynamics-waterfall', title: 'Водопад динамики выручки', desc: 'Топ товаров по росту и падению выручки относительно прошлого периода. Зелёное — рост, красное — падение.',
     help: { shows: 'Водопад из 12 товаров: зелёные столбцы — рост выручки, красные — падение, относительно нуля. Высота = величина изменения в %.',
             how: 'Наведите курсор на столбец для названия товара и точного процента динамики. Слева — самые растущие, справа — падающие.',
