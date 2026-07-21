@@ -174,18 +174,27 @@ header p{font-size:14px;color:#86868b;font-weight:400}
       <div class="chart-card" id="card-ch-sku-stars">
         <div class="chart-header">
           <div><div class="chart-title">Звёзды ассортимента</div><div class="chart-desc">Продажи × Конверсия — 4 квадранта среди конкурентов</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-stars')" title="Справка по графику">?</button>
+          </div>
         </div>
         <div class="chart-container" id="ch-sku-stars" style="height:320px"></div>
       </div>
       <div class="chart-card" id="card-ch-sku-traffic-matrix">
         <div class="chart-header">
           <div><div class="chart-title">Матрица трафика</div><div class="chart-desc">Посещения × Выручка на визит — 4 квадранта среди конкурентов</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-traffic-matrix')" title="Справка по графику">?</button>
+          </div>
         </div>
         <div class="chart-container" id="ch-sku-traffic-matrix" style="height:320px"></div>
       </div>
       <div class="chart-card" id="card-ch-sku-efficiency" style="grid-column:1/-1">
         <div class="chart-header">
           <div><div class="chart-title">Индекс эффективности карточки</div><div class="chart-desc">Сводный индекс по 4 метрикам · ⩾80 — эффективная карточка</div></div>
+          <div class="chart-actions">
+            <button class="help-btn" onclick="openChartHelp('ch-sku-efficiency')" title="Справка по графику">?</button>
+          </div>
         </div>
         <div class="chart-container" id="ch-sku-efficiency" style="height:300px"></div>
       </div>
@@ -2386,8 +2395,23 @@ const CHART_DEFS = [
             why: 'Проверяет, чаще ли покупатели отказываются от дорогих товаров. Помогает оценить риск возвратов при повышении цены.' } },
 ];
 
+const SKU_CHART_HELP = [
+  { id: 'ch-sku-stars', title: 'Звёзды ассортимента', desc: 'Продажи × Конверсия — 4 квадранта среди конкурентов',
+    help: { shows: 'Точечная диаграмма с 4 квадрантами. Ось X — продажи (шт), ось Y — конверсия в покупку (%). Показаны только выбранный товар и 10 конкурентов из той же категории. Синяя точка — выбранный товар, серые — конкуренты. Серые пунктиры — медианы по группе.',
+            how: 'Смотрите, в каком квадранте находится ваш товар: верхний правый = лидер (много продаж + высокая конверсия), нижний левый = аутсайдер. Наведите на точку для названия и точных значений.',
+            why: 'Позволяет быстро оценить позицию товара среди прямых конкурентов по двум ключевым метрикам продаж.' } },
+  { id: 'ch-sku-traffic-matrix', title: 'Матрица трафика', desc: 'Посещения × Выручка на визит — 4 квадранта',
+    help: { shows: 'Точечная диаграмма с 4 квадрантами. Ось X — посещения карточки, ось Y — выручка на визит (₽). Синяя точка — выбранный товар, серые — конкуренты. Серые пунктиры — медианы по группе.',
+            how: 'Верхний правый = много трафика + высокая монетизация. Нижний правый = много трафика, но низкая отдача (проблема с конверсией или ценой). Верхний левый = мало трафика, но высокая отдача (нужно наращивать показы).',
+            why: 'Разделяет стратегии: если трафика мало — наращивать показы и продвижение, если отдача низкая — улучшать карточку.' } },
+  { id: 'ch-sku-efficiency', title: 'Индекс эффективности карточки', desc: 'Сводный индекс по 4 метрикам',
+    help: { shows: 'Горизонтальный рейтинг на основе 4 метрик: выручка/визит, конверсия в заказ, доля выкупа, CTR. Значение нормировано относительно среднего по группе (выбранный товар + 10 конкурентов). Зелёный пунктир — порог 80. Синий столбец — выбранный товар.',
+            how: 'Индекс > 80 — эффективная карточка. Наведите на строку для точного значения. Чем выше индекс, тем лучше карточка проработана по всем метрикам.',
+            why: 'Комплексная оценка качества карточки товара среди прямых конкурентов. Учитывает и трафик, и конверсию, и монетизацию, и выкуп.' } }
+];
+
 function openChartHelp(id) {
-  const def = CHART_DEFS.find(c => c.id === id);
+  const def = CHART_DEFS.find(c => c.id === id) || SKU_CHART_HELP.find(c => c.id === id);
   if (!def) return;
   document.getElementById('helpTitle').textContent = def.title;
   document.getElementById('helpSub').textContent = 'Справка по графику';
