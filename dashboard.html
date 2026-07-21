@@ -71,6 +71,29 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 .kpi-filter-count{font-size:12px;color:#86868b;margin-left:auto;white-space:nowrap}
 @media(max-width:768px){body{padding:12px}.kpi-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.charts-grid{grid-template-columns:1fr}.kpi-value{font-size:16px}.filters-top input,.filters-top select{min-width:120px}.range-group input{width:60px}}
 @media(max-width:480px){.kpi-grid{grid-template-columns:repeat(2,1fr)}header h1{font-size:24px}}
+.tabs{display:flex;gap:4px;margin-top:12px;background:rgba(255,255,255,0.5);border-radius:12px;padding:3px;border:1px solid rgba(0,0,0,.06);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.tab{padding:8px 18px;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit;color:#86868b;background:transparent}
+.tab:hover{color:#1d1d1f;background:rgba(0,0,0,.04)}
+.tab-active{background:#fff;color:#1d1d1f;box-shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)}
+.tab-content{display:none}
+.tab-content-active{display:block}
+.sku-search-bar{background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:16px 20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7);display:flex;align-items:center;gap:12px}
+.sku-search-bar input{flex:1;padding:10px 14px;border:1px solid #d2d2d7;border-radius:10px;font-size:15px;background:rgba(255,255,255,0.9);outline:none;transition:border-color .2s;font-family:inherit;color:#1d1d1f}
+.sku-search-bar input:focus{border-color:#0071e3;box-shadow:0 0 0 3px rgba(0,113,227,.15)}
+.sku-header{background:rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:20px 24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7)}
+.sku-header-title{font-size:20px;font-weight:700;letter-spacing:-.3px;color:#1d1d1f;margin-bottom:6px}
+.sku-header-meta{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:#86868b}
+.sku-header-meta span{white-space:nowrap}
+.sku-header-meta strong{color:#1d1d1f;font-weight:600}
+.sku-table-wrap{background:rgba(255,255,255,0.75);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-radius:16px;padding:4px 20px 20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.03);border:1px solid rgba(255,255,255,0.7)}
+.sku-table{width:100%;border-collapse:collapse;font-size:13px}
+.sku-table td{padding:8px 12px;border-bottom:1px solid rgba(0,0,0,.05);vertical-align:top}
+.sku-table tr:last-child td{border-bottom:none}
+.sku-table td:first-child{font-weight:600;color:#86868b;width:260px;white-space:nowrap}
+.sku-table td:last-child{color:#1d1d1f;word-break:break-word}
+.sku-table tr:hover{background:rgba(0,0,0,.02)}
+.sku-table .section-row td{font-weight:700;color:#1d1d1f;padding-top:16px;padding-bottom:8px;background:transparent;font-size:14px;border-bottom:2px solid rgba(0,0,0,.08)}
+.sku-table .section-row:hover{background:transparent}
 </style>
 </head>
 <body>
@@ -81,8 +104,13 @@ header p{font-size:14px;color:#86868b;font-weight:400}
     <a href="index.html" style="font-size:13px;color:#86868b;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#0071e3'" onmouseout="this.style.color='#86868b'">← На главную</a>
   </div>
   <p id="subtitle">Загрузка данных…</p>
+  <div class="tabs" id="tabsBar">
+    <button class="tab tab-active" onclick="switchTab('dashboard')" data-tab="dashboard">📊 Дашборд</button>
+    <button class="tab" onclick="switchTab('sku')" data-tab="sku">🔍 Поиск по артикулу</button>
+  </div>
 </header>
 
+<div id="tab-dashboard" class="tab-content tab-content-active">
 <div class="kpi-grid" id="kpiGrid"></div>
 <div class="kpi-grid" id="kpiGridAdvanced"></div>
 
@@ -122,6 +150,35 @@ header p{font-size:14px;color:#86868b;font-weight:400}
 </div>
 
 <div class="charts-grid" id="chartsGrid"></div>
+</div>
+
+<div id="tab-sku" class="tab-content">
+  <div class="sku-search-bar">
+    <input type="text" id="skuSearch" placeholder="Введите артикул Ozon…" oninput="onSkuInput(this.value)" onchange="onSkuInput(this.value)" autocomplete="off">
+    <span class="kpi-filter-count" id="skuCount"></span>
+  </div>
+  <div id="skuDetail" style="display:none">
+    <div class="sku-header" id="skuHeader"></div>
+    <div class="charts-grid" style="grid-template-columns:1fr">
+      <div class="chart-card" id="card-ch-sku-radar">
+        <div class="chart-header">
+          <div><div class="chart-title">Профиль метрик товара</div><div class="chart-desc">Значения относительно среднего по рынку (100% — среднее)</div></div>
+        </div>
+        <div class="chart-container" id="ch-sku-radar" style="height:360px"></div>
+      </div>
+    </div>
+    <div class="sku-table-wrap">
+      <div class="section-header"><h2>Все поля товара</h2></div>
+      <table class="sku-table" id="skuTable"></table>
+    </div>
+  </div>
+  <div id="skuEmpty" class="chart-card" style="grid-column:1/-1;padding:40px;text-align:center">
+    <div style="font-size:48px;margin-bottom:16px">🔍</div>
+    <div class="chart-title" style="font-size:18px;margin-bottom:8px">Введите артикул Ozon</div>
+    <div class="chart-desc" style="font-size:14px;line-height:1.6">Начните вводить числовой ID товара на Ozon, чтобы найти товар и увидеть его детальный профиль.</div>
+  </div>
+</div>
+
 </div>
 
 <div class="help-modal" id="helpModal" onclick="if(event.target===this)closeChartHelp()">
@@ -1671,6 +1728,232 @@ function renderBuyoutPrice(d) {
   createChart('ch-buyout-price', option);
 }
 
+// ======================== SKU TAB ========================
+let _skuChart = null;
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('tab-active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('tab-content-active', t.id === 'tab-' + tab));
+  if (tab === 'sku') {
+    const val = document.getElementById('skuSearch').value;
+    if (!val) {
+      document.getElementById('skuEmpty').style.display = 'block';
+      document.getElementById('skuDetail').style.display = 'none';
+    } else {
+      onSkuInput(val);
+    }
+  }
+  setTimeout(() => {
+    if (_skuChart) _skuChart.resize();
+    Object.values(charts).forEach(c => c.resize());
+  }, 200);
+}
+
+function initSkuSearch() {
+  const el = document.getElementById('skuSearch');
+  if (!el) return;
+}
+
+function onSkuInput(val) {
+  val = val.trim();
+  if (!val) {
+    document.getElementById('skuEmpty').style.display = 'block';
+    document.getElementById('skuDetail').style.display = 'none';
+    return;
+  }
+  const row = allData.find(r => String(r['Артикул Ozon'] || '').trim() === val);
+  if (row) {
+    document.getElementById('skuEmpty').style.display = 'none';
+    document.getElementById('skuDetail').style.display = 'block';
+    renderSkuDetail(row);
+  } else {
+    document.getElementById('skuEmpty').style.display = 'block';
+    document.getElementById('skuDetail').style.display = 'none';
+    document.querySelector('#skuEmpty .chart-title').textContent = 'Товар не найден';
+    document.querySelector('#skuEmpty .chart-desc').textContent = 'Товар с артикулом ' + val + ' не найден. Попробуйте другой артикул.';
+  }
+}
+
+function renderSkuDetail(row) {
+  renderSkuHeader(row);
+  renderSkuRadar(row);
+  renderSkuTable(row);
+}
+
+function renderSkuHeader(row) {
+  const el = document.getElementById('skuHeader');
+  const rev = row._revenue || 0;
+  const ord = row._orders || 0;
+  const price = row._price || 0;
+  el.innerHTML = `
+    <div class="sku-header-title">${escHtml(row._name)}</div>
+    <div class="sku-header-meta">
+      <span>Артикул Ozon: <strong>${escHtml(row['Артикул Ozon'] || '—')}</strong></span>
+      <span>Артикул продавца: <strong>${escHtml(row['Артикул продавца'] || '—')}</strong></span>
+      <span>Бренд: <strong>${escHtml(row._brand || '—')}</strong></span>
+      <span>Категория: <strong>${escHtml(row._category || '—')}</strong></span>
+      <span>Цена: <strong>${price.toLocaleString()} ₽</strong></span>
+      <span>Выручка: <strong>${rev.toLocaleString()} ₽</strong></span>
+      <span>Продано: <strong>${ord.toLocaleString()} шт</strong></span>
+    </div>`;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderSkuRadar(row) {
+  const means = {};
+  const metrics = [
+    { key: '_revenuePerVisit', label: 'Выручка/визит', unit: '₽', decimals: 2 },
+    { key: '_purchaseConv', label: 'Конверсия в заказ', unit: '%', decimals: 2 },
+    { key: '_buyout', label: 'Доля выкупа', unit: '%', decimals: 1 },
+    { key: '_ctr', label: 'CTR', unit: '%', decimals: 2 },
+    { key: '_cartConv', label: 'Конверсия в корзину', unit: '%', decimals: 1 },
+    { key: '_priceMargin', label: 'Маржа цены', unit: '%', decimals: 1 }
+  ];
+  const validItems = allData.filter(r => metrics.every(m => (r[m.key] || 0) > 0));
+  metrics.forEach(m => {
+    means[m.key] = validItems.length ? validItems.reduce((s, r) => s + (r[m.key] || 0), 0) / validItems.length : 1;
+  });
+  const values = metrics.map(m => {
+    const v = row[m.key] || 0;
+    const mean = means[m.key] || 1;
+    return +(v / mean * 100).toFixed(0);
+  });
+  const indicator = metrics.map((m, i) => ({
+    name: m.label + ' (' + m.unit + ')',
+    max: 250
+  }));
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: function(params) {
+        let s = '<b>' + escHtml(row._name) + '</b><br/>';
+        const seriesData = Array.isArray(params) ? params : [params];
+        seriesData.forEach(p => {
+          const vals = p.value || [];
+          vals.forEach((v, i) => {
+            const m = metrics[i];
+            if (!m) return;
+            const raw = row[m.key] || 0;
+            s += m.label + ': <b>' + raw.toFixed(m.decimals) + ' ' + m.unit + '</b> (' + v + '% от среднего)<br/>';
+          });
+        });
+        return s;
+      }
+    },
+    radar: {
+      indicator: indicator,
+      center: ['50%', '50%'],
+      radius: '65%',
+      splitArea: { areaStyle: { color: ['rgba(0,113,227,.02)', 'rgba(0,113,227,.05)'] } },
+      axisLine: { lineStyle: { color: 'rgba(0,0,0,.08)' } }
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: values, name: row._name, areaStyle: { color: 'rgba(0,113,227,.25)' }, lineStyle: { color: '#0071e3', width: 2 }, itemStyle: { color: '#0071e3' } }],
+      symbol: 'circle',
+      symbolSize: 6,
+      emphasis: { lineStyle: { width: 3 } }
+    }]
+  };
+  const dom = document.getElementById('ch-sku-radar');
+  if (!dom) return;
+  if (!_skuChart) {
+    _skuChart = echarts.init(dom, null, { renderer: 'canvas' });
+    window.addEventListener('resize', () => _skuChart.resize());
+  }
+  _skuChart.setOption(option, { notMerge: true });
+}
+
+function renderSkuTable(row) {
+  const sections = [
+    { title: 'Основное', fields: [
+      ['Название товара', 'Название товара'],
+      ['Бренд', 'Бренд'],
+      ['Категория 1 уровня', 'Категория 1 уровня'],
+      ['Категория 3 уровня', 'Категория 3 уровня'],
+      ['Артикул Ozon', 'Артикул Ozon'],
+      ['Артикул продавца', 'Артикул продавца'],
+      ['Ссылка на товар', 'Ссылка на товар'],
+      ['Super-товар', 'Super-товар'],
+      ['Схема работы', 'Схема работы']
+    ]},
+    { title: 'Продажи и выручка', fields: [
+      ['Выручка', '_revenue', 'currency'],
+      ['Заказано товаров, шт', '_orders', 'number'],
+      ['Среднесуточные продажи, ₽', '_dailySales', 'currency'],
+      ['Среднесуточные продажи, шт', '_dailySalesQty', 'number'],
+      ['Динамика суммы заказов, %', '_dynamics', 'percentSigned'],
+      ['Упущенные продажи, ₽', '_lost', 'currency'],
+      ['Потенциальный спрос, ₽', '_potentialDemand', 'currency']
+    ]},
+    { title: 'Цена', fields: [
+      ['Средняя цена покупки, ₽', '_price', 'currency'],
+      ['Самая низкая цена, ₽', '_lowestPrice', 'currency'],
+      ['Цена за 1 г, ₽', '_pricePerGram', 'decimal'],
+      ['Маржа цены, %', '_priceMargin', 'percent'],
+      ['Средний чек, ₽', '_avgCheck', 'currency']
+    ]},
+    { title: 'Трафик и конверсия', fields: [
+      ['Показы в поиске и каталоге', '_impressions', 'number'],
+      ['Посещения карточки товара', '_visits', 'number'],
+      ['CTR из поиска, %', '_ctr', 'percent'],
+      ['Конверсия в корзину (из поиска), %', '_cartConv', 'percent'],
+      ['В корзину из поиска и каталога, %', 'В корзину из поиска и каталога, %'],
+      ['Конверсия в покупку, %', '_purchaseConv', 'percent'],
+      ['Конверсия из показа, %', '_impressionConv', 'percent'],
+      ['Выручка на показ, ₽', '_revenuePerImp', 'decimal'],
+      ['Выручка на визит, ₽', '_revenuePerVisit', 'decimal']
+    ]},
+    { title: 'Затраты', fields: [
+      ['Доля рекламных расходов, %', '_adShare', 'percent'],
+      ['Доля затрат на Ozon FBO, %', '_fboCost', 'percent'],
+      ['Доля затрат на Ozon FBS, %', '_fbsCost', 'percent'],
+      ['ADS на единицу объёма, ₽/л', '_adsPerVolume', 'decimal'],
+      ['Эффективность схемы', '_schemeEff', 'decimal']
+    ]},
+    { title: 'Склад и остатки', fields: [
+      ['Дней без остатка, дни', '_daysInStock', 'number'],
+      ['Дней с остатком, дни', '_daysWithStock', 'number'],
+      ['Коэффициент дефицита, %', '_deficitRatio', 'percent'],
+      ['Объём товара, л', '_volume', 'decimal']
+    ]},
+    { title: 'Прочее', fields: [
+      ['Вес из названия, г', '_weightG', 'number'],
+      ['Доля выкупа, %', '_buyout', 'percent'],
+      ['Дата создания карточки', 'Дата создания карточки товара']
+    ]}
+  ];
+  let html = '';
+  sections.forEach(sec => {
+    html += '<tr class="section-row"><td colspan="2">' + sec.title + '</td></tr>';
+    sec.fields.forEach(([label, field, type]) => {
+      let val;
+      if (field.startsWith('_')) {
+        const raw = row[field];
+        if (type === 'currency') val = (raw || 0).toLocaleString() + ' ₽';
+        else if (type === 'percent') val = (raw || 0).toFixed(1) + '%';
+        else if (type === 'percentSigned') val = (raw || 0) >= 0 ? '+' + (raw || 0).toFixed(1) + '%' : (raw || 0).toFixed(1) + '%';
+        else if (type === 'decimal') val = (raw || 0).toFixed(2);
+        else if (type === 'number') val = (raw || 0).toLocaleString();
+        else val = raw != null ? String(raw) : '—';
+      } else {
+        const raw = row[field];
+        if (field === 'Ссылка на товар' && raw) {
+          val = '<a href="' + escHtml(raw) + '" target="_blank" style="color:#0071e3">' + escHtml(raw) + '</a>';
+        } else {
+          val = raw != null && raw !== '' ? escHtml(String(raw)) : '—';
+        }
+      }
+      html += '<tr><td>' + label + '</td><td>' + val + '</td></tr>';
+    });
+  });
+  document.getElementById('skuTable').innerHTML = html;
+}
+
 // ======================== INIT ========================
 function initDashboard() {
   populateFilters();
@@ -1678,6 +1961,7 @@ function initDashboard() {
   applyFilters();
   renderKPI();
   renderCharts();
+  initSkuSearch();
 }
 
 function populateFilters() {
