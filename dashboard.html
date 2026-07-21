@@ -170,6 +170,26 @@ header p{font-size:14px;color:#86868b;font-weight:400}
         <div class="chart-container" id="ch-sku-radar" style="height:360px"></div>
       </div>
     </div>
+    <div class="charts-grid" id="skuCompCharts">
+      <div class="chart-card" id="card-ch-sku-stars">
+        <div class="chart-header">
+          <div><div class="chart-title">Звёзды ассортимента</div><div class="chart-desc">Продажи × Конверсия — 4 квадранта среди конкурентов</div></div>
+        </div>
+        <div class="chart-container" id="ch-sku-stars" style="height:320px"></div>
+      </div>
+      <div class="chart-card" id="card-ch-sku-traffic-matrix">
+        <div class="chart-header">
+          <div><div class="chart-title">Матрица трафика</div><div class="chart-desc">Посещения × Выручка на визит — 4 квадранта среди конкурентов</div></div>
+        </div>
+        <div class="chart-container" id="ch-sku-traffic-matrix" style="height:320px"></div>
+      </div>
+      <div class="chart-card" id="card-ch-sku-efficiency" style="grid-column:1/-1">
+        <div class="chart-header">
+          <div><div class="chart-title">Индекс эффективности карточки</div><div class="chart-desc">Сводный индекс по 4 метрикам · ⩾80 — эффективная карточка</div></div>
+        </div>
+        <div class="chart-container" id="ch-sku-efficiency" style="height:300px"></div>
+      </div>
+    </div>
     <div class="sku-competitors-wrap" id="skuCompetitorsWrap" style="display:none">
       <div class="section-header"><h2>Конкуренты в категории</h2><p>Топ-10 товаров той же категории с большей выручкой</p></div>
       <div class="charts-grid" style="grid-template-columns:1fr">
@@ -1760,6 +1780,10 @@ function switchTab(tab) {
   }
   setTimeout(() => {
     if (_skuChart) _skuChart.resize();
+    if (_skuStarsChart) _skuStarsChart.resize();
+    if (_skuTrafficChart) _skuTrafficChart.resize();
+    if (_skuEffChart) _skuEffChart.resize();
+    if (_compChart) _compChart.resize();
     Object.values(charts).forEach(c => c.resize());
   }, 200);
 }
@@ -1798,12 +1822,24 @@ function getCompetitors(row) {
     .slice(0, 10);
 }
 
+let _skuStarsChart = null;
+let _skuTrafficChart = null;
+let _skuEffChart = null;
+
 function renderSkuDetail(row) {
   const competitors = getCompetitors(row);
   renderSkuHeader(row);
   renderSkuRadar(row, competitors);
+  renderSkuCompCharts(competitors, row);
   renderSkuTable(row);
   renderSkuCompetitors(competitors, row);
+}
+
+function renderSkuCompCharts(competitors, row) {
+  const all = competitors.concat([row]);
+  renderSkuStars(all, row);
+  renderSkuTrafficMatrix(all, row);
+  renderSkuEfficiency(all, row);
 }
 
 function renderSkuHeader(row) {
@@ -2005,6 +2041,118 @@ function renderSkuTable(row) {
 }
 
 let _compChart = null;
+
+function computeMed(arr) {
+  const s = arr.slice().sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+function renderSkuStars(all, row) {
+  const pts = all.filter(r => r._orders > 0 && r._purchaseConv > 0);
+  if (pts.length < 3) { document.getElementById('card-ch-sku-stars').style.display = 'none'; return; }
+  document.getElementById('card-ch-sku-stars').style.display = '';
+  const medX = computeMed(pts.map(r => r._orders));
+  const medY = computeMed(pts.map(r => r._purchaseConv));
+  const data = pts.map(r => ({
+    value: [r._orders, r._purchaseConv],
+    name: r._name,
+    itemStyle: r === row ? { color: '#0071e3', opacity: 1 } : { color: 'rgba(134,134,139,0.5)' },
+    symbolSize: r === row ? 14 : 8
+  }));
+  const option = {
+    tooltip: { formatter: p => '<b>' + escHtml(p.data.name) + '</b><br/>Продажи: <b>' + fmt(p.data.value[0]) + ' шт</b><br/>Конверсия: <b>' + p.data.value[1].toFixed(2) + '%</b>' },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'value', name: 'Продано, шт', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Конверсия в заказ, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: data,
+      emphasis: { scale: 1.8 },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#86868b', type: 'dashed', width: 1 },
+        data: [
+          { xAxis: medX, label: { formatter: 'медиана', position: 'insideEndTop', fontSize: 9, color: '#86868b' } },
+          { yAxis: medY, label: { formatter: 'медиана', position: 'insideEndTop', fontSize: 9, color: '#86868b' } }
+        ]
+      }
+    }]
+  };
+  const dom = document.getElementById('ch-sku-stars');
+  if (!dom) return;
+  if (!_skuStarsChart) { _skuStarsChart = echarts.init(dom, null, { renderer: 'canvas' }); window.addEventListener('resize', () => _skuStarsChart.resize()); }
+  _skuStarsChart.setOption(option, { notMerge: true });
+}
+
+function renderSkuTrafficMatrix(all, row) {
+  const pts = all.filter(r => r._visits > 0 && r._revenuePerVisit > 0);
+  if (pts.length < 3) { document.getElementById('card-ch-sku-traffic-matrix').style.display = 'none'; return; }
+  document.getElementById('card-ch-sku-traffic-matrix').style.display = '';
+  const medX = computeMed(pts.map(r => r._visits));
+  const medY = computeMed(pts.map(r => r._revenuePerVisit));
+  const data = pts.map(r => ({
+    value: [r._visits, r._revenuePerVisit],
+    name: r._name,
+    itemStyle: r === row ? { color: '#0071e3', opacity: 1 } : { color: 'rgba(134,134,139,0.5)' },
+    symbolSize: r === row ? 14 : 8
+  }));
+  const option = {
+    tooltip: { formatter: p => '<b>' + escHtml(p.data.name) + '</b><br/>Посещения: <b>' + fmt(p.data.value[0]) + '</b><br/>Выручка/визит: <b>' + p.data.value[1].toFixed(2) + ' \u20BD</b>' },
+    grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
+    xAxis: { type: 'value', name: 'Посещения', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
+    yAxis: { type: 'value', name: 'Выручка на визит, \u20BD', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(2) + '\u20BD', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    series: [{
+      type: 'scatter', data: data,
+      emphasis: { scale: 1.8 },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#86868b', type: 'dashed', width: 1 },
+        data: [
+          { xAxis: medX, label: { formatter: 'медиана', position: 'insideEndTop', fontSize: 9, color: '#86868b' } },
+          { yAxis: medY, label: { formatter: 'медиана', position: 'insideEndTop', fontSize: 9, color: '#86868b' } }
+        ]
+      }
+    }]
+  };
+  const dom = document.getElementById('ch-sku-traffic-matrix');
+  if (!dom) return;
+  if (!_skuTrafficChart) { _skuTrafficChart = echarts.init(dom, null, { renderer: 'canvas' }); window.addEventListener('resize', () => _skuTrafficChart.resize()); }
+  _skuTrafficChart.setOption(option, { notMerge: true });
+}
+
+function renderSkuEfficiency(all, row) {
+  const metrics = ['_revenuePerVisit', '_purchaseConv', '_buyout', '_ctr'];
+  const hasAll = all.filter(r => metrics.every(m => (r[m] || 0) > 0));
+  if (hasAll.length < 3) { document.getElementById('card-ch-sku-efficiency').style.display = 'none'; return; }
+  document.getElementById('card-ch-sku-efficiency').style.display = '';
+  const means = {};
+  metrics.forEach(m => { means[m] = hasAll.reduce((s, r) => s + (r[m] || 0), 0) / hasAll.length; });
+  const scored = hasAll.map(r => {
+    const z = metrics.reduce((s, m) => s + ((r[m] || 0) / means[m]), 0) / metrics.length * 100;
+    return { name: r._name, score: Math.min(100, z), row: r };
+  }).sort((a, b) => b.score - a.score);
+  const items = scored.slice(0).reverse();
+  const labels = items.map(r => r.name.length > 22 ? r.name.slice(0, 22) + '\u2026' : r.name);
+  const vals = items.map(r => r.score);
+  const full = items.map(r => r.name);
+  const colors = items.map(r => r.row === row ? '#0071e3' : null);
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+      const i = p[0].dataIndex; return '<b>' + escHtml(full[i]) + '</b><br/>Индекс: <b>' + vals[i].toFixed(1) + '</b>'; } },
+    grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
+    yAxis: { type: 'category', data: labels, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 9 } },
+    series: [{
+      type: 'bar', data: vals.map((v, i) => ({ value: v, itemStyle: colors[i] ? { color: '#0071e3', borderRadius: [0,4,4,0] } : { color: 'rgba(134,134,139,0.4)', borderRadius: [0,4,4,0] } })), barMaxWidth: 18,
+      label: { show: true, position: 'right', formatter: p => p.value.toFixed(0), fontSize: 9, color: '#86868b' },
+      markLine: {
+        silent: true, symbol: 'none', lineStyle: { color: '#34c759', type: 'dashed', width: 1.5 },
+        data: [{ xAxis: 80, label: { formatter: 'Порог 80', position: 'insideEndTop', fontSize: 9, color: '#34c759' } }]
+      }
+    }]
+  };
+  const dom = document.getElementById('ch-sku-efficiency');
+  if (!dom) return;
+  if (!_skuEffChart) { _skuEffChart = echarts.init(dom, null, { renderer: 'canvas' }); window.addEventListener('resize', () => _skuEffChart.resize()); }
+  _skuEffChart.setOption(option, { notMerge: true });
+}
 
 function renderSkuCompetitors(competitors, row) {
   const wrap = document.getElementById('skuCompetitorsWrap');
