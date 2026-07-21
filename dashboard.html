@@ -1864,7 +1864,7 @@ function getCompetitors(row) {
   const myRev = row._revenue || 0;
   return allData
     .filter(r => r._category === cat && r !== row && (r._revenue || 0) > myRev)
-    .sort((a, b) => (b._revenue || 0) - (a._revenue || 0))
+    .sort((a, b) => (a._revenue || 0) - (b._revenue || 0))
     .slice(0, 10);
 }
 
