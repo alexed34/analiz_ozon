@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Кофе на Ozon — Дашборд</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;background:#f5f5f7;color:#1d1d1f;-webkit-font-smoothing:antialiased;padding:20px}
@@ -174,32 +173,20 @@ function parseNum(v) {
   return 0;
 }
 
-function parsePct(v) {
-  if (v == null || v === '' || v === '—' || v === '-') return 0;
-  let s = String(v).trim().replace('%', '').replace(/\s/g, '').replace(',', '.');
-  let n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
-}
 let DATA_PERIOD = '28 дней';
 
-function parseXLSXData(wb) {
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, rawNumbers: true, defval: '' });
-  if (json.length < 3) return [];
+function parseJSONData(json) {
+  if (json.length < 2) return [];
   DATA_PERIOD = '28 дней';
-  for (const r of json.slice(0, 3)) {
-    const cell = r && r[0] != null ? String(r[0]) : '';
-    if (cell.startsWith('Период:')) {
-      DATA_PERIOD = cell.replace('Период:', '').trim();
-      break;
-    }
+  let startIdx = 0;
+  if (json[0] && json[0][0] && typeof json[0][0] === 'string' && json[0][0].startsWith('Период:')) {
+    DATA_PERIOD = json[0][0].replace('Период:', '').trim();
+    startIdx = 1;
   }
-  let headerIdx = json.findIndex(row => Array.isArray(row) && row.some(c => String(c || '').trim() === 'Название товара'));
-  if (headerIdx < 0) headerIdx = 0;
-  let headers = json[headerIdx].map(h => String(h || '').trim());
+  let headers = json[startIdx].map(h => String(h || '').trim());
   headers = headers.map(h => h.replace(/\u20BD/g, '?'));
   const rows = [];
-  for (let i = headerIdx + 1; i < json.length; i++) {
+  for (let i = startIdx + 1; i < json.length; i++) {
     const vals = json[i];
     if (!vals || vals.length < 3) continue;
     if (vals.every(v => v == null || v === '' || v === '—')) continue;
@@ -209,14 +196,8 @@ function parseXLSXData(wb) {
       if (v == null) v = '';
       row[h] = v;
       if (NUMERIC_FIELDS[h]) {
-        if (h.includes('%')) {
-          if (typeof v === 'number') row[h + '_num'] = v * 100;
-          else row[h + '_num'] = parsePct(String(v));
-        } else {
-          if (typeof v === 'number') row[h + '_num'] = v;
-          else if (typeof v === 'string' && v.includes('из')) row[h + '_num'] = parseNum(v);
-          else row[h + '_num'] = parseNum(String(v));
-        }
+        if (typeof v === 'number') row[h + '_num'] = v;
+        else row[h + '_num'] = parseNum(String(v));
       }
     });
     row._name = row['Название товара'] || '';
@@ -252,7 +233,7 @@ function parseXLSXData(wb) {
 // ======================== INDEXEDDB CACHE ========================
 const DB_NAME = 'coffeeDashboard';
 const DB_STORE = 'dataset';
-const DB_CACHE_KEY = 'main_12ddcac';
+const DB_CACHE_KEY = 'main_13ddcac';
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -300,7 +281,7 @@ async function loadData() {
     if (cached && cached.lastModified) reqHeaders['If-Modified-Since'] = cached.lastModified;
     let resp;
     try {
-      resp = await fetch('data.xlsx?v=12ddcac', { headers: reqHeaders });
+      resp = await fetch('data.json?v=13ddcac', { headers: reqHeaders });
     } catch (netErr) {
       if (cached && cached.data && cached.data.length) {
         allData = cached.data;
@@ -319,9 +300,8 @@ async function loadData() {
       return;
     }
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const buf = await resp.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
-    allData = parseXLSXData(wb);
+    const json = await resp.json();
+    allData = parseJSONData(json);
     if (allData.length === 0) throw new Error('Нет данных');
     const lm = resp.headers.get('last-modified');
     try { await setCached({ data: allData, lastModified: lm, period: DATA_PERIOD }); } catch (_) {}
@@ -329,7 +309,7 @@ async function loadData() {
     document.getElementById('subtitle').textContent = allData.length.toLocaleString() + ' товаров · ' + DATA_PERIOD + ' · ' + label;
     initDashboard();
   } catch (e) {
-    document.getElementById('subtitle').textContent = 'Ошибка загрузки data.xlsx — ' + e.message + '. Запустите локальный сервер.';
+    document.getElementById('subtitle').textContent = 'Ошибка загрузки data.json — ' + e.message + '. Запустите локальный сервер.';
   }
 }
 
