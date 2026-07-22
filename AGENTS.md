@@ -4,14 +4,17 @@
 
 ```
 ├── index.html                          # Landing page + Web3Forms feedback form
-├── dashboard.html                      # ECharts dashboard (28 charts) — loads data.json
+├── dashboard.html                      # ECharts dashboard (28+ charts) — loads data.json
 ├── data.xlsx                           # Source of truth: Ozon export (~10K rows, Russian cols)
 ├── data.json                           # Pre-processed (array-of-arrays), consumed by dashboard
 ├── parse_to_csv.py                     # Pipeline: data.xlsx → data.json (derived cols + normalization)
 ├── headers.json                        # Column header names (gitignored, auto-generated)
 ├── описание столбцов.txt               # Column descriptions (Russian)
+├── описание_дашборда.md                # Dashboard architecture + auto-generated chart list
 ├── визуализации_рынка_кофе.md          # Chart reference doc (original draft)
-└── справка_по_графикам.md              # Chart reference doc (final — describes all 28 charts)
+├── справка_по_графикам.md              # Chart reference doc (final — describes all 28+ charts)
+└── scripts/
+    └── generate_dashboard_doc.py       # Extracts CHART_DEFS → updates описание_дашборда.md
 ```
 
 ## Data pipeline
@@ -20,7 +23,7 @@
 - **`parse_to_csv.py`** converts `data.xlsx` → `data.json` (run manually). It:
   - Auto-detects header row by searching for `Название товара`, skips metadata rows above
   - Normalizes formatted cells (` ₽`, `X из 28`, `0001-01-01`, percentages)
-  - Adds 16 derived columns (weight, price category, CTR, conversion, margin, etc.)
+  - Adds 16 derived columns (weight, price category, CTR, conversion, margin, deficit ratio, etc.)
   - Outputs `data.json` as a flat array-of-arrays (period row, header row, data rows)
   - Uses hardcoded absolute paths for `SRC` / `DST` — update if repo moves
   - Derived columns are computed by hardcoded column index — adding/removing base columns requires updating index references
@@ -32,13 +35,22 @@
 
 ## Dashboard (dashboard.html)
 
+- **Architecture doc**: `описание_дашборда.md` — описывает структуру, поток данных, фильтры, KPI, SKU-таб, кэширование. Читать вместо `dashboard.html` целиком.
 - No build step — serve with `python -m http.server 8080`, `npx serve .`, or Live Server
 - Uses **ECharts.js** (CDN only, v5.5.0); reads `data.json` via `fetch()` — **will not work from `file://`**
-- 28 charts (see `CHART_DEFS`), single page: filters bar, KPI row, 3 chart sections (priority, card efficiency, detail)
+- 38 charts (registered in `CHART_DEFS`), single page: filters bar, KPI row, 3 chart sections (priority, card efficiency, detail)
 - Cross-filtering: clicking category/brand charts fills the corresponding filter dropdown
 - Filters saved to `localStorage`, restored on reload
 - Offline fallback: IndexedDB cache on network failure
 - Fullscreen per chart (`toggleFullscreen`) and PNG export (`exportChartPNG`) built-in
+
+### Auto-update chart list
+
+When adding/removing charts in `dashboard.html` (editing `CHART_DEFS` array), update the description:
+```
+python scripts/generate_dashboard_doc.py
+```
+The script extracts `CHART_DEFS` + section info from `dashboard.html` and regenerates the chart list in `описание_дашборда.md` (between `<!-- CHART_LIST_START -->` / `<!-- CHART_LIST_END -->` markers).
 
 ## Feedback form (index.html)
 

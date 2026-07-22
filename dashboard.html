@@ -349,6 +349,11 @@ function parseNum(v) {
 
 let DATA_PERIOD = '28 дней';
 
+function limitScatter(rows) {
+  if (rows.length <= 500) return rows;
+  return rows.slice().sort((a, b) => (b._revenue || 0) - (a._revenue || 0)).slice(0, 500);
+}
+
 function parseJSONData(json) {
   if (json.length < 2) return [];
   DATA_PERIOD = '28 дней';
@@ -738,9 +743,9 @@ function handleChartClick(sourceId, params) {
 
 // ---- 1. Potential Demand x Deficit Ratio ----
 function renderDemandDeficit(d) {
-  const pts = d.filter(r => r._potentialDemand > 0 && r._deficitRatio > 0);
+  const pts = limitScatter(d.filter(r => r._potentialDemand > 0 && r._deficitRatio > 0));
   const descEl = document.getElementById('card-ch-demand-deficit')?.querySelector('.chart-desc');
-  if (descEl) descEl.textContent = pts.length + ' товаров с дефицитом · цвет — тип кофе';
+  if (descEl) descEl.textContent = pts.length + ' товаров с дефицитом · цвет — тип кофе' + (d.filter(r => r._potentialDemand > 0 && r._deficitRatio > 0).length > 500 ? ' · показано ' + pts.length + ' из ' + d.filter(r => r._potentialDemand > 0 && r._deficitRatio > 0).length : '');
   if (!pts.length) return;
   const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
   const catColors = {};
@@ -774,7 +779,7 @@ function renderDemandDeficit(d) {
 
 // ---- 2. Price per Gram vs Daily Sales ----
 function renderPricePerGramSales(d) {
-  const pts = d.filter(r => r._pricePerGram > 0 && r._dailySales > 0);
+  const pts = limitScatter(d.filter(r => r._pricePerGram > 0 && r._dailySales > 0));
   const cats = [...new Set(pts.map(r => r._category))].filter(Boolean);
   const catColors = {};
   cats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
@@ -797,9 +802,9 @@ function renderPricePerGramSales(d) {
 
 // ---- 3. Sales x Conversion Stars (4 quadrants) ----
 function renderSalesConversionStars(d) {
-  const pts = d.filter(r => r._orders > 0 && r._purchaseConv > 0);
+  const pts = limitScatter(d.filter(r => r._orders > 0 && r._purchaseConv > 0));
   const dc = document.getElementById('card-ch-sales-conv-stars')?.querySelector('.chart-desc');
-  if (dc) dc.textContent = pts.length + ' товаров · конверсия > 0';
+  if (dc) dc.textContent = pts.length + ' товаров · конверсия > 0' + (d.filter(r => r._orders > 0 && r._purchaseConv > 0).length > 500 ? ' · показано ' + pts.length + ' из ' + d.filter(r => r._orders > 0 && r._purchaseConv > 0).length : '');
   if (!pts.length) return;
   const option = {
     tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Продажи: <b>${fmt(p.data.value[0])} шт</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
@@ -840,7 +845,7 @@ function renderRevenuePerVisitTop(d) {
 
 // ---- 5. OOS Losses (Lost Sales vs Days OOS) ----
 function renderOOSLosses(d) {
-  const pts = d.filter(r => r._daysInStock > 0 && r._lost > 0);
+  const pts = limitScatter(d.filter(r => r._daysInStock > 0 && r._lost > 0));
   const option = {
     tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Дней без остатка: <b>${p.data.value[0]}</b><br/>Потеряно: <b>${fmt(p.data.value[1])} ₽</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -856,7 +861,7 @@ function renderOOSLosses(d) {
 
 // ---- 7. Ad Efficiency (Ad Share vs Revenue) ----
 function renderAdEfficiency(d) {
-  const pts = d.filter(r => r._adShare > 0 && r._revenue > 0);
+  const pts = limitScatter(d.filter(r => r._adShare > 0 && r._revenue > 0));
   const option = {
     tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Реклама: <b>${p.data.value[0].toFixed(1)}%</b><br/>Выручка: <b>${fmt(p.data.value[1])} ₽</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -930,7 +935,7 @@ function renderCardRevenuePerVisit(d) {
 
 // ---- 12. Visits -> Conversion Scatter ----
 function renderVisitsConversion(d) {
-  const pts = d.filter(r => r._visits > 0 && r._purchaseConv > 0);
+  const pts = limitScatter(d.filter(r => r._visits > 0 && r._purchaseConv > 0));
   if (!pts.length) return;
   const medV = pts.map(r => r._visits).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
   const medC = pts.map(r => r._purchaseConv).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
@@ -953,7 +958,7 @@ function renderVisitsConversion(d) {
 
 // ---- 13. Cart Conversion -> Order Conversion ----
 function renderCartToOrderConv(d) {
-  const pts = d.filter(r => r._cartConv > 0 && r._purchaseConv > 0);
+  const pts = limitScatter(d.filter(r => r._cartConv > 0 && r._purchaseConv > 0));
   if (!pts.length) return;
   const option = {
     tooltip: { formatter: p => `<b>${p.data.name}</b><br/>В корзину: <b>${p.data.value[0].toFixed(1)}%</b><br/>В заказ: <b>${p.data.value[1].toFixed(2)}%</b>` },
@@ -999,7 +1004,7 @@ function renderCardFunnel(d) {
 
 // ---- 15. Traffic x Revenue per Visit Matrix ----
 function renderTrafficRevPerVisit(d) {
-  const pts = d.filter(r => r._visits > 0 && r._revenuePerVisit > 0);
+  const pts = limitScatter(d.filter(r => r._visits > 0 && r._revenuePerVisit > 0));
   if (!pts.length) return;
   const medV = pts.map(r => r._visits).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
   const medR = pts.map(r => r._revenuePerVisit).sort((a, b) => a - b)[Math.floor(pts.length / 2)];
@@ -1249,7 +1254,9 @@ function renderPriceDist(d) {
 
 // ---------- 4. Price vs Sales ----------
 function renderPriceSales(d) {
-  const points = d.filter(r => r._price >= 30 && r._orders > 0);
+  const points = limitScatter(d.filter(r => r._price >= 30 && r._orders > 0));
+  const dc = document.getElementById('card-ch-price-sales')?.querySelector('.chart-desc');
+  if (dc) dc.textContent = (d.filter(r => r._price >= 30 && r._orders > 0).length > 500 ? 'Показано ' + points.length + ' из ' + d.filter(r => r._price >= 30 && r._orders > 0).length + ' · ' : '') + 'цена vs продажи';
   const option = {
     tooltip: { formatter: p => {
       const d = p.value; return `<b>${p.data.name || ''}</b><br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Продано: <b>${fmt(d[1])} шт</b>`;
@@ -1268,11 +1275,12 @@ function renderPriceSales(d) {
 
 // ---------- 5. Bubble Chart ----------
 function renderBubble(d) {
-  const categories = [...new Set(d.map(r => r._category))].filter(Boolean);
+  const bubbleData = limitScatter(d.filter(r => r._price >= 30 && r._orders > 0 && r._revenue > 0));
+  const categories = [...new Set(bubbleData.map(r => r._category))].filter(Boolean);
   const catColors = {};
   categories.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
   const series = categories.map(cat => {
-    const items = d.filter(r => r._category === cat && r._price >= 30 && r._orders > 0 && r._revenue > 0);
+    const items = bubbleData.filter(r => r._category === cat);
     return {
       name: cat, type: 'scatter',
       data: items.map(r => ({ value: [r._price, r._revenue, r._orders], name: r._name })),
@@ -1373,7 +1381,7 @@ function renderFunnel(d) {
 
 // ---------- 9. Shows vs Visits ----------
 function renderShowsVisits(d) {
-  const points = d.filter(r => r._impressions > 0 && r._visits > 0);
+  const points = limitScatter(d.filter(r => r._impressions > 0 && r._visits > 0));
   const option = {
     tooltip: { formatter: p => {
       const d = p.data; return `<b>${d.name || ''}</b><br/>Показы: <b>${fmt(d[0])}</b><br/>Посещения: <b>${fmt(d[1])}</b>`;
@@ -1635,11 +1643,12 @@ function renderSuperCompare(d) {
 
 // ---------- 21. Weight vs Price Scatter ----------
 function renderWeightPrice(d) {
-  const categories = [...new Set(d.map(r => r._category))].filter(Boolean);
+  const weightPriceData = limitScatter(d.filter(r => r._weight > 0 && r._price >= 30));
+  const categories = [...new Set(weightPriceData.map(r => r._category))].filter(Boolean);
   const catColors = {};
   categories.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
   const series = categories.map(cat => {
-    const items = d.filter(r => r._category === cat && r._weight > 0 && r._price >= 30);
+    const items = weightPriceData.filter(r => r._category === cat);
     return {
       name: cat, type: 'scatter',
       data: items.map(r => ({ value: [r._weight, r._price], name: r._name })),
@@ -1706,7 +1715,7 @@ function renderDynamicsWaterfall(d) {
 
 // ---------- 24. Shows vs Revenue Scatter ----------
 function renderShowsRevenue(d) {
-  const points = d.filter(r => r._impressions > 0 && r._revenue > 0);
+  const points = limitScatter(d.filter(r => r._impressions > 0 && r._revenue > 0));
   if (!points.length) return;
   const option = {
     tooltip: { formatter: p => {
@@ -1809,7 +1818,7 @@ function renderWeightDonut(d) {
 
 // ---------- 28. Buyout vs Price Scatter ----------
 function renderBuyoutPrice(d) {
-  const points = d.filter(r => r._price >= 30 && r._buyout > 0);
+  const points = limitScatter(d.filter(r => r._price >= 30 && r._buyout > 0));
   if (!points.length) return;
   const option = {
     tooltip: { formatter: p => {
