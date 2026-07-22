@@ -796,7 +796,7 @@ function renderDemandDeficit(d) {
   })).filter(s => s.data.length > 0);
   if (!series.length) return;
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Спрос: <b>${fmt(p.data.value[0])} ₽</b><br/>Дефицит: <b>${p.data.value[1].toFixed(1)}%</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Спрос: <b>${fmt(p.data.value[0])} ₽</b><br/>Дефицит: <b>${p.data.value[1].toFixed(1)}%</b>` },
     legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
     grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
     xAxis: { type: 'log', name: 'Потенциальный спрос, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
@@ -822,7 +822,7 @@ function renderPricePerGramSales(d) {
     emphasis: { itemStyle: { opacity: 1 }, scale: 1.5 }
   })).filter(s => s.data.length > 0);
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Цена/г: <b>${p.data.value[0].toFixed(2)} ₽</b><br/>Продажи/день: <b>${fmt(p.data.value[1])} ₽</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>${p.seriesName}<br/>Цена/г: <b>${p.data.value[0].toFixed(2)} ₽</b><br/>Продажи/день: <b>${fmt(p.data.value[1])} ₽</b>` },
     legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
     grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
     xAxis: { type: 'log', name: 'Цена за грамм, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
@@ -839,7 +839,7 @@ function renderSalesConversionStars(d) {
   if (dc) dc.textContent = pts.length + ' товаров · конверсия > 0' + (d.filter(r => r._orders > 0 && r._purchaseConv > 0).length > 500 ? ' · показано ' + pts.length + ' из ' + d.filter(r => r._orders > 0 && r._purchaseConv > 0).length : '');
   if (!pts.length) return;
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Продажи: <b>${fmt(p.data.value[0])} шт</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>Продажи: <b>${fmt(p.data.value[0])} шт</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'log', name: 'Продано, шт', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
     yAxis: { type: 'value', name: 'Конверсия, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -860,7 +860,7 @@ function renderRevenuePerVisitTop(d) {
   const vals = items.map(r => r._revenuePerVisit);
   const full = items.map(r => r._name);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const i = p[0].dataIndex; return `<b>${full[i]}</b><br/>Выручка/визит: <b>${vals[i].toFixed(2)} ₽</b>`; } },
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
     xAxis: { type: 'value', axisLabel: { formatter: v => v.toFixed(1) + '₽', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -879,7 +879,7 @@ function renderRevenuePerVisitTop(d) {
 function renderOOSLosses(d) {
   const pts = limitScatter(d.filter(r => r._daysInStock > 0 && r._lost > 0));
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Дней без остатка: <b>${p.data.value[0]}</b><br/>Потеряно: <b>${fmt(p.data.value[1])} ₽</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>Дней без остатка: <b>${p.data.value[0]}</b><br/>Потеряно: <b>${fmt(p.data.value[1])} ₽</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'value', name: 'Дней без остатка', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
     yAxis: { type: 'log', name: 'Упущенные продажи, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -895,7 +895,7 @@ function renderOOSLosses(d) {
 function renderAdEfficiency(d) {
   const pts = limitScatter(d.filter(r => r._adShare > 0 && r._revenue > 0));
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Реклама: <b>${p.data.value[0].toFixed(1)}%</b><br/>Выручка: <b>${fmt(p.data.value[1])} ₽</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>Реклама: <b>${p.data.value[0].toFixed(1)}%</b><br/>Выручка: <b>${fmt(p.data.value[1])} ₽</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'value', name: 'Доля рекламы, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 } },
     yAxis: { type: 'log', name: 'Выручка, ₽', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -917,7 +917,7 @@ function renderBrandEfficiency(d) {
   const vals = entries.map(e => e[1]);
   const full = entries.map(e => e[0]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const i = p[0].dataIndex; return `<b>${full[i]}</b><br/>Выручка/SKU: <b>${fmt(vals[i])} ₽</b><br/>SKU: ${skuMap[full[i]]}`; } },
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
     xAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -943,7 +943,7 @@ function renderPotentialDemandPareto(d) {
   const vals = items.slice(0, 30).map(r => r.val);
   const cumPct = items.slice(0, 30).map(r => { cumSum += r.val / total * 100; return cumSum; });
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => {
       const idx = p[0]?.dataIndex ?? 0; const item = items[idx];
       return `<b>${item?.name || ''}</b><br/>Спрос: <b>${fmt(item?.val || 0)} ₽</b><br/>Доля: ${(item?.val / total * 100).toFixed(1)}% / Накоплено: ${cumPct[idx]?.toFixed(1)}%`; } },
     grid: { left: 10, right: 50, top: 10, bottom: 40, containLabel: true },
@@ -976,7 +976,7 @@ function renderVisitsConversion(d) {
     return highV && highC ? '#34c759' : highV && !highC ? '#ff9500' : !highV && highC ? '#0071e3' : '#ff3b30';
   });
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>Визиты: <b>${fmt(p.data.value[0])}</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>Визиты: <b>${fmt(p.data.value[0])}</b><br/>Конверсия: <b>${p.data.value[1].toFixed(2)}%</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'log', name: 'Посещения', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
     yAxis: { type: 'value', name: 'Конверсия в заказ, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -993,7 +993,7 @@ function renderCartToOrderConv(d) {
   const pts = limitScatter(d.filter(r => r._cartConv > 0 && r._purchaseConv > 0));
   if (!pts.length) return;
   const option = {
-    tooltip: { formatter: p => `<b>${p.data.name}</b><br/>В корзину: <b>${p.data.value[0].toFixed(1)}%</b><br/>В заказ: <b>${p.data.value[1].toFixed(2)}%</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => `<b>${p.data.name}</b><br/>В корзину: <b>${p.data.value[0].toFixed(1)}%</b><br/>В заказ: <b>${p.data.value[1].toFixed(2)}%</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'value', name: 'Конверсия в корзину, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: '{value}%', fontSize: 10 } },
     yAxis: { type: 'value', name: 'Конверсия в заказ, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -1022,7 +1022,7 @@ function renderCardFunnel(d) {
     { name: 'Выкуплено', value: Math.round(estimatedBuyouts) }
   ];
   const option = {
-    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${fmt(p.value)} (${p.percent}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${fmt(p.value)} (${p.percent}%)` },
     series: [{
       type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%', minSize: '5%', maxSize: '100%', sort: 'descending', gap: 4,
       label: { show: true, position: 'inside', formatter: p => `${p.name}\n${fmt(p.value)}`, fontSize: 11, color: '#fff', fontWeight: 600 },
@@ -1046,7 +1046,7 @@ function renderTrafficRevPerVisit(d) {
   });
   const names = pts.map(r => r._name);
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const i = p.dataIndex; return `<b>${names[i]}</b><br/>Визиты: <b>${fmt(p.data.value[0])}</b><br/>Выручка/визит: <b>${p.data.value[1].toFixed(2)} ₽</b>`; } },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'log', name: 'Посещения', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
@@ -1076,7 +1076,7 @@ function renderCardEfficiencyIndex(d) {
   const vals = scored.map(r => r.score);
   const full = scored.map(r => r.name);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const i = p[0].dataIndex; return `<b>${full[i]}</b><br/>Индекс: <b>${vals[i].toFixed(1)}</b>`; } },
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
     xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -1194,7 +1194,7 @@ function renderRevenueByCategory(d) {
   const labels = entries.map(e => e[0]);
   const values = entries.map(e => e[1]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const v = p[0]; return `<b>${v.name}</b><br/>Выручка: <b>${fmt(v.value)} ₽</b> (${(v.value / values.reduce((a,b)=>a+b,0) * 100).toFixed(1)}%)`;
     }},
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -1218,7 +1218,7 @@ function renderTopBrands(d) {
   const values = entries.map(e => e[1]);
   const fullNames = entries.map(e => e[0]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Выручка: <b>${fmt(values[idx])} ₽</b>`;
     }},
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
@@ -1261,7 +1261,7 @@ function renderPriceDist(d) {
     hist[idx]++;
   });
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       return `${p[0].name} ₽<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)${excluded ? `<br/><span style="color:#86868b;font-size:10px">${excluded.toLocaleString()} выбросов скрыто</span>` : ''}`;
     }},
     grid: { left: 10, right: 20, top: 10, bottom: 50, containLabel: true },
@@ -1290,7 +1290,7 @@ function renderPriceSales(d) {
   const dc = document.getElementById('card-ch-price-sales')?.querySelector('.chart-desc');
   if (dc) dc.textContent = (d.filter(r => r._price >= 30 && r._orders > 0).length > 500 ? 'Показано ' + points.length + ' из ' + d.filter(r => r._price >= 30 && r._orders > 0).length + ' · ' : '') + 'цена vs продажи';
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const d = p.value; return `<b>${p.data.name || ''}</b><br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Продано: <b>${fmt(d[1])} шт</b>`;
     }},
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -1322,7 +1322,7 @@ function renderBubble(d) {
     };
   }).filter(s => s.data.length > 0);
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const d = p.data.value; return `<b>${p.data.name || ''}</b><br/>${p.seriesName}<br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Выручка: <b>${fmt(d[1])} ₽</b><br/>Продано: <b>${fmt(d[2])} шт</b>`;
     }},
     legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
@@ -1343,7 +1343,7 @@ function renderPareto(d) {
   const vals = items.slice(0, 30).map(r => r.val);
   const cumPct = items.slice(0, 30).map(r => { cumSum += r.val / total * 100; return cumSum; });
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => {
       const idx = p[0]?.dataIndex ?? 0;
       const item = items[idx];
       return `<b>${item?.name || ''}</b><br/>Выручка: <b>${fmt(item?.val || 0)} ₽</b><br/>Доля: ${(item?.val / total * 100).toFixed(1)}% / Накоплено: ${cumPct[idx]?.toFixed(1)}%`;
@@ -1370,7 +1370,7 @@ function renderDailySales(d) {
   const labels = entries.map(e => e[0]);
   const values = entries.map(e => e[1]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${p[0].name}</b><br/>Среднесуточные продажи: <b>${fmt(p[0].value)} ₽</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${p[0].name}</b><br/>Среднесуточные продажи: <b>${fmt(p[0].value)} ₽</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: 'value', axisLabel: { formatter: v => fmtM(v) }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -1398,7 +1398,7 @@ function renderFunnel(d) {
     { name: 'Заказано', value: sales }
   ];
   const option = {
-    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${fmt(p.value)} (${p.percent}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${fmt(p.value)} (${p.percent}%)` },
     series: [{
       type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%', minSize: '10%', maxSize: '100%', sort: 'descending', gap: 4,
       label: { show: true, position: 'inside', formatter: p => `${p.name}\n${fmt(p.value)}`, fontSize: 11, color: '#fff', fontWeight: 600 },
@@ -1415,7 +1415,7 @@ function renderFunnel(d) {
 function renderShowsVisits(d) {
   const points = limitScatter(d.filter(r => r._impressions > 0 && r._visits > 0));
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const d = p.data; return `<b>${d.name || ''}</b><br/>Показы: <b>${fmt(d[0])}</b><br/>Посещения: <b>${fmt(d[1])}</b>`;
     }},
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -1440,7 +1440,7 @@ function renderLostSales(d) {
   const values = entries.map(e => e[1]);
   const fullNames = entries.map(e => e[0]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Упущенные продажи: <b>${fmt(values[idx])} ₽</b>`;
     }},
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
@@ -1462,7 +1462,7 @@ function renderCategoryDist(d) {
   d.forEach(r => { const k = r._category || 'Другое'; map[k] = (map[k] || 0) + 1; });
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
   const option = {
-    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>SKU: <b>${p.value}</b> (${p.percent}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'item', formatter: p => `<b>${p.name}</b><br/>SKU: <b>${p.value}</b> (${p.percent}%)` },
     series: [{
       type: 'pie', radius: ['40%', '70%'],
       data: entries.map(([k, v], i) => ({ name: k, value: v, itemStyle: { color: COLORS[i % COLORS.length] } })),
@@ -1483,7 +1483,7 @@ function renderBrandOrders(d) {
   const values = entries.map(e => e[1]);
   const fullNames = entries.map(e => e[0]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Продано: <b>${fmt(values[idx])} \u0448\u0442</b>`;
     }},
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
@@ -1512,7 +1512,7 @@ function renderAdShareByBrand(d) {
   const values = entries.map(e => e[1]);
   const fullNames = entries.map(e => e[0]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Доля рекламы: <b>${values[idx].toFixed(1)}%</b>`;
     }},
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
@@ -1541,7 +1541,7 @@ function renderCartConvByBrand(d) {
   const values = entries.map(e => e[1]);
   const fullNames = entries.map(e => e[0]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex; return `<b>${fullNames[idx]}</b><br/>Конверсия: <b>${values[idx].toFixed(1)}%</b>`;
     }},
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
@@ -1580,7 +1580,7 @@ function renderDynamicsHist(d) {
   });
   const n = clipped.length;
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)` },
     grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
     xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(labels.length / 8)) }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: 'value', axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -1609,7 +1609,7 @@ function renderBuyoutByCategory(d) {
   const labels = entries.map(e => e[0]);
   const values = entries.map(e => e[1]);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${p[0].name}</b><br/>Выкуп: <b>${p[0].value.toFixed(1)}%</b>` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<b>${p[0].name}</b><br/>Выкуп: <b>${p[0].value.toFixed(1)}%</b>` },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 10, interval: 0, overflow: 'truncate', width: 80 }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: 'value', axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -1629,7 +1629,7 @@ function renderSchemeDist(d) {
   d.forEach(r => { const k = r._scheme || 'Не указана'; map[k] = (map[k] || 0) + 1; });
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
   const option = {
-    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>Товаров: <b>${p.value}</b> (${p.percent}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'item', formatter: p => `<b>${p.name}</b><br/>Товаров: <b>${p.value}</b> (${p.percent}%)` },
     series: [{
       type: 'pie', radius: ['40%', '70%'],
       data: entries.map(([k, v], i) => ({ name: k, value: v, itemStyle: { color: COLORS[i % COLORS.length] } })),
@@ -1656,7 +1656,7 @@ function renderSuperCompare(d) {
   const ordData = labels.map(g => groups[g].ord);
   const convData = labels.map(g => groups[g].cnt ? groups[g].conv / groups[g].cnt : 0);
   const option = {
-    tooltip: { trigger: 'axis', formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', formatter: p => {
       const idx = p[0].dataIndex; const g = labels[idx];
       return `<b>${g}</b><br/>Выручка: <b>${fmt(revData[idx])} \u20BD</b><br/>Продано: <b>${fmt(ordData[idx])} \u0448\u0442</b><br/>Конв. в корзину: <b>${convData[idx].toFixed(1)}%</b>`;
     }},
@@ -1691,7 +1691,7 @@ function renderWeightPrice(d) {
   }).filter(s => s.data.length > 0);
   if (!series.length) return;
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const d = p.data.value; return `<b>${p.data.name || ''}</b><br/>${p.seriesName}<br/>Вес: <b>${d[0]} г</b><br/>Цена: <b>${fmt(d[1])} \u20BD</b>`;
     }},
     legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10 }, itemWidth: 12, itemHeight: 12 },
@@ -1728,7 +1728,7 @@ function renderDynamicsWaterfall(d) {
   });
   const names = items.map(r => r.name.length > 16 ? r.name.slice(0, 16) + '…' : r.name);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex;
       return `<b>${items[idx].name}</b><br/>Динамика: <b>${items[idx].val > 0 ? '+' : ''}${items[idx].val.toFixed(1)}%</b>`;
     }},
@@ -1750,7 +1750,7 @@ function renderShowsRevenue(d) {
   const points = limitScatter(d.filter(r => r._impressions > 0 && r._revenue > 0));
   if (!points.length) return;
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const d = p.data; return `<b>${d.name || ''}</b><br/>Показы: <b>${fmt(d[0])}</b><br/>Выручка: <b>${fmt(d[1])} ₽</b>`;
     }},
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -1778,7 +1778,7 @@ function renderFboFbsCost(d) {
     fbs.push(fbsItems.length ? fbsItems.reduce((s, r) => s + r._fbsCost, 0) / fbsItems.length : 0);
   });
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const idx = p[0].dataIndex;
       return `<b>${schemes[idx]}</b><br/>FBO: <b>${fbo[idx].toFixed(1)}%</b><br/>FBS: <b>${fbs[idx].toFixed(1)}%</b>`;
     }},
@@ -1815,7 +1815,7 @@ function renderDaysOosHist(d) {
   });
   const n = vals.length;
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name} дн.<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name} дн.<br/>Товаров: <b>${p[0].value}</b> (${(p[0].value / n * 100).toFixed(1)}%)` },
     grid: { left: 10, right: 20, top: 10, bottom: 40, containLabel: true },
     xAxis: { type: 'category', data: labels, axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(labels.length / 7)) }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: 'value', axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -1837,7 +1837,7 @@ function renderWeightDonut(d) {
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return;
   const option = {
-    tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>Товаров: <b>${p.value}</b> (${p.percent}%)` },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'item', formatter: p => `<b>${p.name}</b><br/>Товаров: <b>${p.value}</b> (${p.percent}%)` },
     series: [{
       type: 'pie', radius: ['45%', '72%'],
       data: entries.map(([k, v], i) => ({ name: k, value: v, itemStyle: { color: COLORS[i % COLORS.length] } })),
@@ -1853,7 +1853,7 @@ function renderBuyoutPrice(d) {
   const points = limitScatter(d.filter(r => r._price >= 30 && r._buyout > 0));
   if (!points.length) return;
   const option = {
-    tooltip: { formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => {
       const d = p.data; return `<b>${d.name || ''}</b><br/>Цена: <b>${fmt(d[0])} ₽</b><br/>Выкуп: <b>${d[1].toFixed(1)}%</b>`;
     }},
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
@@ -2102,7 +2102,7 @@ function renderSkuRadar(row, competitors) {
     max: 250
   }));
   const option = {
-    tooltip: {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999',
       trigger: 'item',
       formatter: function(params) {
         const items = Array.isArray(params) ? params : [params];
@@ -2261,7 +2261,7 @@ function renderSkuStars(all, row) {
     symbolSize: r === row ? 14 : 8
   }));
   const option = {
-    tooltip: { formatter: p => '<b>' + escHtml(p.data.name) + '</b><br/>Продажи: <b>' + fmt(p.data.value[0]) + ' шт</b><br/>Конверсия: <b>' + p.data.value[1].toFixed(2) + '%</b>' },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => '<b>' + escHtml(p.data.name) + '</b><br/>Продажи: <b>' + fmt(p.data.value[0]) + ' шт</b><br/>Конверсия: <b>' + p.data.value[1].toFixed(2) + '%</b>' },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'value', name: 'Продано, шт', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { fontSize: 10 } },
     yAxis: { type: 'value', name: 'Конверсия в заказ, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -2333,7 +2333,7 @@ function renderSkuFunnel(row, competitors) {
   const mine = [1000, (row._ctr || 0) * 10, (row._ctr || 0) * (row._cartConv || 0) / 10, (row._ctr || 0) * (row._purchaseConv || 0) / 10, (row._ctr || 0) * (row._purchaseConv || 0) * (row._buyout || 0) / 1000];
   const data = stages.map((name, i) => ({ name, mine: mine[i], benchmark: b.funnel[i] || 0 }));
   const option = {
-    tooltip: { trigger: 'item', formatter: p => { const d = data.find(x => x.name === p.name); return '<b>' + p.name + '</b><br/>' + p.seriesName + ': <b>' + p.value.toFixed(1) + '</b> на 1 000 показов<br/>Конкуренты: <b>' + d.benchmark.toFixed(1) + '</b>'; } },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'item', formatter: p => { const d = data.find(x => x.name === p.name); return '<b>' + p.name + '</b><br/>' + p.seriesName + ': <b>' + p.value.toFixed(1) + '</b> на 1 000 показов<br/>Конкуренты: <b>' + d.benchmark.toFixed(1) + '</b>'; } },
     legend: { data: ['Выбранный товар', 'Конкурентный бенчмарк'], bottom: 0, textStyle: { fontSize: 11, color: '#86868b' } },
     series: [
       { name: 'Конкурентный бенчмарк', type: 'funnel', left: '8%', top: 16, bottom: 34, width: '84%', min: 0, max: 1000, minSize: '8%', maxSize: '100%', sort: 'none', gap: 3, label: { show: true, position: 'inside', fontSize: 10, color: '#515154', formatter: p => p.name + ': ' + p.value.toFixed(0) }, itemStyle: { color: 'rgba(134,134,139,.28)', borderColor: '#fff', borderWidth: 1 }, data: data.map(d => ({ name: d.name, value: d.benchmark })) },
@@ -2360,7 +2360,7 @@ function renderSkuImpCtrMatrix(all, row) {
     symbolSize: r === row ? 16 : Math.max(8, Math.min(18, Math.sqrt(r._revenue || 0) / 100))
   }));
   const option = {
-    tooltip: { formatter: p => '<b>' + escHtml(p.data.name) + '</b><br/>Показы: <b>' + fmt(p.data.value[0]) + '</b><br/>CTR: <b>' + p.data.value[1].toFixed(2) + '%</b><br/>Выручка: <b>' + fmt(p.data.revenue || 0) + ' ₽</b>' },
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', formatter: p => '<b>' + escHtml(p.data.name) + '</b><br/>Показы: <b>' + fmt(p.data.value[0]) + '</b><br/>CTR: <b>' + p.data.value[1].toFixed(2) + '%</b><br/>Выручка: <b>' + fmt(p.data.revenue || 0) + ' ₽</b>' },
     grid: { left: 10, right: 20, top: 10, bottom: 30, containLabel: true },
     xAxis: { type: 'value', name: 'Показы', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => fmtM(v), fontSize: 10 } },
     yAxis: { type: 'value', name: 'CTR, %', nameTextStyle: { fontSize: 10, color: '#86868b' }, axisLabel: { formatter: v => v.toFixed(1) + '%', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -2404,7 +2404,7 @@ function renderSkuEfficiency(all, row) {
   const full = items.map(r => r.name);
   const colors = items.map(r => r.row === row ? '#0071e3' : null);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const i = p[0].dataIndex; return '<b>' + escHtml(full[i]) + '</b><br/>Индекс: <b>' + vals[i].toFixed(1) + '</b>'; } },
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
     xAxis: { type: 'value', min: 0, axisLabel: { formatter: '{value}', fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -2435,7 +2435,7 @@ function renderSkuMetricBar(all, row, chartId, field, label, fmt) {
   const full = items.map(r => r._name);
   const isSelected = items.map(r => r === row);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const i = p[0].dataIndex; return '<b>' + escHtml(full[i]) + '</b><br/>' + label + ': <b>' + vals[i].toFixed(fmt.decimals) + fmt.suffix + '</b>'; } },
     grid: { left: 10, right: 50, top: 10, bottom: 10, containLabel: true },
     xAxis: { type: 'value', axisLabel: { formatter: function(v) { return v >= 1e3 ? v.toFixed(0) : v.toFixed(fmt.decimals); }, fontSize: 10 }, splitLine: { lineStyle: { color: LIGHT_BG } } },
@@ -2475,7 +2475,7 @@ function renderCompChart(competitors, row) {
   const vals = items.map(r => r._revenue || 0);
   const full = items.map(r => r._name);
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
+    tooltip: { confine: true, appendToBody: true, extraCssText: 'z-index:9999', trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => {
       const i = p[0].dataIndex; return '<b>' + escHtml(full[i]) + '</b><br/>Выручка: <b>' + fmt(vals[i]) + ' \u20BD</b>'; } },
     grid: { left: 10, right: 50, top: 10, bottom: 10, containLabel: true },
     xAxis: { type: 'value', axisLabel: { formatter: function(v) { return v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0); } }, splitLine: { lineStyle: { color: LIGHT_BG } } },
